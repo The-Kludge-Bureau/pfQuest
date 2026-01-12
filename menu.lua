@@ -1,3 +1,8 @@
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local getn = table.getn
+local GetTime = GetTime
+
 do -- minimap icon
   pfQuestIcon = CreateFrame('Button', "pfQuestIcon", Minimap)
   pfQuestIcon:SetClampedToScreen(true)

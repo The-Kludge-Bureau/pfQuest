@@ -1,3 +1,11 @@
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local floor, ceil, sqrt, abs = math.floor, math.ceil, math.sqrt, math.abs
+local sin, cos, atan2, rad, pi = math.sin, math.cos, math.atan2, math.rad, math.pi
+local min, max = math.min, math.max
+local getn, insert, sort = table.getn, table.insert, table.sort
+local GetTime = GetTime
+
 -- table.getn doesn't return sizes on tables that
 -- are using a named index on which setn is not updated
 local function tablesize(tbl)
@@ -6,8 +14,8 @@ local function tablesize(tbl)
   return count
 end
 
-function modulo(val, by)
-  return val - math.floor(val/by)*by;
+local function modulo(val, by)
+  return val - floor(val/by)*by;
 end
 
 local function GetNearest(xstart, ystart, db, blacklist)
@@ -17,10 +25,11 @@ local function GetNearest(xstart, ystart, db, blacklist)
   for id, data in pairs(db) do
     if data[1] and data[2] and not blacklist[id] then
       local x,y = xstart - data[1], ystart - data[2]
-      local distance = ceil(math.sqrt(x*x+y*y)*100)/100
+      -- Use squared distance for comparison (avoid sqrt)
+      local distSq = x*x + y*y
 
-      if not nearest or distance < nearest then
-        nearest = distance
+      if not nearest or distSq < nearest then
+        nearest = distSq
         best = id
       end
     end

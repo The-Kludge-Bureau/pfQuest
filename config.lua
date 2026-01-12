@@ -2,6 +2,10 @@
 local compat = pfQuestCompat
 local L = pfQuest_Loc
 
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local getn = table.getn
+
 pfQuest_history = {}
 pfQuest_colors = {}
 pfQuest_config = {}

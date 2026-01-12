@@ -1,5 +1,14 @@
 -- multi api compat
 local compat = pfQuestCompat
+
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local min, max = math.min, math.max
+local getn = table.getn
+local date = date
+local GetTime = GetTime
+local MouseIsOver = MouseIsOver
+
 local collapsed = {}
 
 local function tablesize(tbl)
@@ -211,8 +220,18 @@ end)
 
 pfJournal.entries:SetScript("OnClick", pfJournal.entries.ReloadJournal)
 pfJournal.entries:SetScript("OnUpdate", function()
-  if ( this.tick or 1) > GetTime() then return else this.tick = GetTime() + 1 end
+  -- Only reload when dirty flag is set (avoids polling every second)
+  -- The dirty flag is set by quest.lua when pfQuest_history changes
+  if not pfJournal.dirty then return end
+  if (this.tick or 1) > GetTime() then return end
+  this.tick = GetTime() + 0.5
+  pfJournal.dirty = nil
   this:ReloadJournal()
+end)
+
+-- Mark journal dirty when shown (initial load)
+pfJournal:SetScript("OnShow", function()
+  pfJournal.dirty = true
 end)
 
 pfUI.api.CreateBackdrop(pfJournal.entries)

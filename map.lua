@@ -1,6 +1,18 @@
 -- multi api compat
 local compat = pfQuestCompat
 
+-- Performance: cache frequently-used globals
+local pairs, ipairs, next = pairs, ipairs, next
+local strfind, strlower, strsub = strfind, strlower, strsub
+local format = string.format
+local min, max, abs = math.min, math.max, math.abs
+local sqrt, sin, cos = sqrt or math.sqrt, sin or math.sin, cos or math.cos
+local floor, ceil = floor or math.floor, ceil or math.ceil
+local getn, insert = table.getn, table.insert
+local tostring, tonumber, type, unpack = tostring, tonumber, type, unpack
+local GetTime = GetTime
+local MouseIsOver = MouseIsOver
+
 -- fake the pfQuest minimap node names to Gatherer names,
 -- if any minimap-breaking addon collector is found.
 local nodename = "pfMiniMapPin"
@@ -63,6 +75,9 @@ local unifiedcache = {}
 -- the objects here get directly attached to the pfMap nodes
 local similar_nodes = {}
 
+-- Coordinate parse cache (shared between UpdateNodes and UpdateMinimap)
+local coord_cache = {}
+
 local function IsEmpty(tabl)
   for k,v in pairs(tabl) do
     return false
@@ -87,6 +102,10 @@ local layers = {
   [pfQuestConfig.path.."\\img\\cluster_item_mono"]  = 9,
   [pfQuestConfig.path.."\\img\\cluster_misc_mono"]  = 9,
 }
+
+-- Pre-computed texture paths (avoid string concatenation in hot paths)
+local TEX_NODECUT = pfQuestConfig.path.."\\img\\nodecut"
+local TEX_NODE = pfQuestConfig.path.."\\img\\node"
 
 local function GetLayerByTexture(tex)
   if layers[tex] then return layers[tex] else return 1 end
@@ -815,13 +834,13 @@ function pfMap:UpdateNode(frame, node, color, obj, distance)
     end
 
     if obj == "minimap" and pfQuest_config["cutoutminimap"] == "1" then
-      frame.tex:SetTexture(pfQuestConfig.path.."\\img\\nodecut")
+      frame.tex:SetTexture(TEX_NODECUT)
       frame.tex:SetVertexColor(r,g,b,1)
     elseif obj ~= "minimap" and pfQuest_config["cutoutworldmap"] == "1" then
-      frame.tex:SetTexture(pfQuestConfig.path.."\\img\\nodecut")
+      frame.tex:SetTexture(TEX_NODECUT)
       frame.tex:SetVertexColor(r,g,b,1)
     else
-      frame.tex:SetTexture(pfQuestConfig.path.."\\img\\node")
+      frame.tex:SetTexture(TEX_NODE)
       frame.tex:SetVertexColor(r,g,b,1)
     end
   end
@@ -875,8 +894,15 @@ function pfMap:UpdateNodes()
 
         pfMap:UpdateNode(pfMap.pins[i], node, color)
 
-        -- set position
-        local _, _, x, y = strfind(coords, "(.*)|(.*)")
+        -- set position (use cached coord parse to avoid strfind alloc)
+        local x, y
+        if coord_cache[coords] then
+          x, y = coord_cache[coords][1], coord_cache[coords][2]
+        else
+          local _, _, strx, stry = strfind(coords, "(.*)|(.*)")
+          x, y = strx + 0, stry + 0
+          coord_cache[coords] = { x, y }
+        end
 
         -- write points to the route plan
         if ( pfQuest_config["routecluster"] == "1" and pfMap.pins[i].layer >= 9 ) or
@@ -918,9 +944,11 @@ function pfMap:UpdateNodes()
   for j=i, table.getn(pfMap.pins) do
     if pfMap.pins[j] then pfMap.pins[j]:Hide() end
   end
+
+  -- Perform tracker layout once after all ButtonAdd calls complete
+  pfQuest.tracker.DoLayout()
 end
 
-local coord_cache = {}
 function pfMap:UpdateMinimap()
   -- check for disabled minimap nodes
   if pfQuest_config["minimapnodes"] == "0" then

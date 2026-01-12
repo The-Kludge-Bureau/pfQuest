@@ -1,6 +1,12 @@
 -- multi api compat
 local compat = pfQuestCompat
 
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local concat, insert, getn = table.concat, table.insert, table.getn
+local type = type
+local format = string.format
+
 SLASH_PFDB1, SLASH_PFDB2, SLASH_PFDB3, SLASH_PFDB4 = "/db", "/shagu", "/pfquest", "/pfdb"
 SlashCmdList["PFDB"] = function(input, editbox)
   local params = {}
@@ -33,20 +39,18 @@ SlashCmdList["PFDB"] = function(input, editbox)
   local command
 
   for command in compat.gfind(input, "[^ ]+") do
-    table.insert(commandlist, command)
+    insert(commandlist, command)
   end
 
-  local arg1, arg2 = commandlist[1], ""
+  local arg1 = commandlist[1]
 
   -- handle whitespace mob- and item names correctly
-  for i in pairs(commandlist) do
-    if (i ~= 1) then
-      arg2 = arg2 .. commandlist[i]
-      if (commandlist[i+1] ~= nil) then
-        arg2 = arg2 .. " "
-      end
-    end
+  -- Use table.concat to avoid string concatenation garbage
+  local arg2parts = {}
+  for i = 2, getn(commandlist) do
+    arg2parts[i-1] = commandlist[i]
   end
+  local arg2 = concat(arg2parts, " ")
 
   -- argument: debug
   if (arg1 == "debug") then

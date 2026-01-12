@@ -4,6 +4,15 @@ local _, _, _, client = GetBuildInfo()
 client = client or 11200
 local _G = client == 11200 and getfenv(0) or _G
 
+-- Performance: cache frequently-used globals
+local pairs, ipairs, next = pairs, ipairs, next
+local strfind = strfind
+local format = string.format
+local getn, insert, concat = table.getn, table.insert, table.concat
+local tostring, tonumber, type = tostring, tonumber, type
+local GetTime = GetTime
+local UnitLevel = UnitLevel
+
 pfQuest = CreateFrame("Frame")
 pfQuest.icons = {}
 
@@ -66,15 +75,15 @@ function pfQuest:SortedPairs(t, index, reverse)
 end
 
 pfQuest.queue = {}
+pfQuest.queueCount = 0  -- Track queue size to avoid O(n) tsize() calls
 pfQuest.abandon = ""
 pfQuest.questlog = {}
 pfQuest.questlog_tmp = {}
 
-local function tsize(tbl)
-  if not tbl or not type(tbl) == "table" then return 0 end
-  local c = 0
-  for _ in pairs(tbl) do c = c + 1 end
-  return c
+-- Helper to add to queue with count tracking
+local function queueAdd(entry)
+  insert(pfQuest.queue, entry)
+  pfQuest.queueCount = pfQuest.queueCount + 1
 end
 
 local skillstate = ""
@@ -95,10 +104,12 @@ pfQuest:SetScript("OnEvent", function()
       return
     end
   elseif event == "SKILL_LINES_CHANGED" then
-    local skills = ""
+    -- Use table.concat to avoid string concatenation garbage
+    local skillParts = {}
     for i=0, GetNumSkillLines() do
-      skills = skills .. (GetSkillLineInfo(i) or "")
+      skillParts[i+1] = GetSkillLineInfo(i) or ""
     end
+    local skills = concat(skillParts)
 
     -- update quest givers when new skills or
     -- professions became available
@@ -134,7 +145,7 @@ pfQuest:SetScript("OnUpdate", function()
     this.qlogtick = GetTime() + 1
   end
 
-  if this.updateQuestLog == true and tsize(this.queue) == 0 then
+  if this.updateQuestLog == true and pfQuest.queueCount == 0 then
     pfQuest:Debug("Update Quest|cff33ffcc Log")
     pfQuest:UpdateQuestlog()
     this.updateQuestLog = false
@@ -151,7 +162,7 @@ pfQuest:SetScript("OnUpdate", function()
     this.updateQuestGivers = false
   end
 
-  if tsize(this.queue) == 0 then return end
+  if pfQuest.queueCount == 0 then return end
 
   -- process queue
   for id, entry in pairs(this.queue) do
@@ -166,6 +177,8 @@ pfQuest:SetScript("OnUpdate", function()
       else
         pfQuest_history[entry[2]] = { time(), UnitLevel("player") }
       end
+      -- Mark journal dirty when history changes
+      if pfJournal then pfJournal.dirty = true end
 
       if pfQuest_config["trackingmethod"] ~= 4 then
         -- delete nodes by title
@@ -205,18 +218,19 @@ pfQuest:SetScript("OnUpdate", function()
       end
     end
 
-    -- remove entry from queue
+    -- remove entry from queue and decrement counter
     pfQuest.queue[id] = nil
+    pfQuest.queueCount = pfQuest.queueCount - 1
 
     -- only return when other entries exist
     -- otherwise, continue and update questgivers
-    for id, entry in pairs(this.queue) do
+    if pfQuest.queueCount > 0 then
       return
     end
   end
 
   -- trigger questgiver update
-  if tsize(this.queue) == 0 then
+  if pfQuest.queueCount == 0 then
     this.updateQuestLog = true
     this.updateQuestGivers = true
   end
@@ -241,19 +255,21 @@ function pfQuest:UpdateQuestlog()
       questid = pfDatabase:GetQuestIDs(qlogid)
       questid = questid and tonumber(questid[1]) or title
       watched = IsQuestWatched(qlogid)
-      state = watched and "track" or ""
 
-      -- build state string
+      -- build state string using table.concat (avoid string concat garbage)
+      local stateParts = { watched and "track" or "" }
       if objectives then
         for i=1, objectives, 1 do
           local text, _, done = GetQuestLogLeaderBoard(i, qlogid)
-          state = state .. i .. (done and "done" or "todo")
+          stateParts[getn(stateParts)+1] = i
+          stateParts[getn(stateParts)+1] = done and "done" or "todo"
         end
       end
+      state = concat(stateParts)
 
       -- add new quest to the questlog
       if not pfQuest.questlog[questid] then
-        table.insert(pfQuest.queue, { title, questid, qlogid, "NEW" })
+        queueAdd({ title, questid, qlogid, "NEW" })
         pfQuest.questlog_tmp[questid] = {
           title = title,
           qlogid = qlogid,
@@ -261,13 +277,13 @@ function pfQuest:UpdateQuestlog()
         }
         change = true
       elseif pfQuest.questlog[questid].qlogid ~= qlogid then
-        table.insert(pfQuest.queue, { title, questid, qlogid, "RELOAD" })
+        queueAdd({ title, questid, qlogid, "RELOAD" })
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
         pfQuest.questlog_tmp[questid].qlogid = qlogid
         pfQuest.questlog_tmp[questid].state = state
         change = true
       elseif pfQuest.questlog[questid].state ~= state then
-        table.insert(pfQuest.queue, { title, questid, qlogid, "RELOAD" })
+        queueAdd({ title, questid, qlogid, "RELOAD" })
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
         pfQuest.questlog_tmp[questid].qlogid = qlogid
         pfQuest.questlog_tmp[questid].state = state
@@ -286,7 +302,7 @@ function pfQuest:UpdateQuestlog()
   -- quest removal events
   for questid, data in pairs(pfQuest.questlog) do
     if not pfQuest.questlog_tmp[questid] then
-      table.insert(pfQuest.queue, { data.title, questid, nil, "REMOVE" })
+      queueAdd({ data.title, questid, nil, "REMOVE" })
       change = true
     end
   end

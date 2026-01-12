@@ -1,6 +1,20 @@
 -- multi api compat
 local compat = pfQuestCompat
 
+-- Performance: cache frequently-used globals
+local pairs, ipairs, next = pairs, ipairs, next
+local strfind, strlower, strlen = strfind, strlower, strlen
+local format = string.format
+local min, max, abs = math.min, math.max, math.abs
+local floor, ceil = floor or math.floor, ceil or math.ceil
+local band = bit.band
+local getn, insert, concat = table.getn, table.insert, table.concat
+local tostring, tonumber, type = tostring, tonumber, type
+local unpack = unpack
+local GetTime = GetTime
+local UnitLevel, UnitRace, UnitClass = UnitLevel, UnitRace, UnitClass
+local UnitFactionGroup, UnitName, UnitSex = UnitFactionGroup, UnitName, UnitSex
+
 pfDatabase = { icons = {} }
 
 local loc = GetLocale()
@@ -32,15 +46,22 @@ end
 
 -- Return the best cluster point for a coordiante table
 local best, neighbors = { index = 1, neighbors = 0 }, 0
-local cache, cacheindex = {}
-local ymin, ymax, xmin, ymax
+local cache, cacheindex = {}, nil
+local cache_count = 0
+local CLUSTER_CACHE_MAX = 200
+local ymin, ymax, xmin, xmax
 local function getcluster(tbl, name)
   local count = 0
   best.index, best.neighbors = 1, 0
-  cacheindex = string.format("%s:%s", name, table.getn(tbl))
+  cacheindex = format("%s:%s", name, getn(tbl))
 
   -- calculate new cluster if nothing is cached
   if not cache[cacheindex] then
+    -- evict cache if too large
+    if cache_count >= CLUSTER_CACHE_MAX then
+      cache = {}
+      cache_count = 0
+    end
     for index, data in pairs(tbl) do
       -- precalculate the limits, and compare directly.
       -- This way is much faster than the math.abs function.
@@ -62,6 +83,7 @@ local function getcluster(tbl, name)
     end
 
     cache[cacheindex] = { tbl[best.index][1] + .001, tbl[best.index][2] + .001, count }
+    cache_count = cache_count + 1
   end
 
   return cache[cacheindex][1], cache[cacheindex][2], cache[cacheindex][3]
@@ -69,20 +91,27 @@ end
 
 -- Detects if a non indexed table is empty
 local function isempty(tbl)
-  for _ in pairs(tbl) do return end
-  return true
+  return next(tbl) == nil
 end
 
 -- Returns the levenshtein distance between two strings
 -- based on: https://gist.github.com/Badgerati/3261142
-local len1, len2, cost, best
+local len1, len2, cost, lev_best
 local levcache = {}
+local levcache_count = 0
+local LEVCACHE_MAX = 500
+
+-- Pre-allocate matrix for strings up to 100 chars (reused across calls)
+local lev_matrix = {}
+for i = 0, 100 do lev_matrix[i] = {} end
+
 local function lev(str1, str2, limit)
-  if levcache[str1..":"..str2] then
-    return levcache[str1..":"..str2]
+  local key = str1..":"..str2
+  if levcache[key] then
+    return levcache[key]
   end
 
-  len1, len2, cost = string.len(str1), string.len(str2), 0
+  len1, len2, cost = strlen(str1), strlen(str2), 0
 
   -- abort early on empty strings
   if len1 == 0 then
@@ -93,10 +122,11 @@ local function lev(str1, str2, limit)
     return 0
   end
 
-  -- initialise the base matrix
-  local matrix = {}
+  -- initialise the base matrix (reuse pre-allocated matrix)
+  local matrix = lev_matrix
   for i = 0, len1, 1 do
-    matrix[i] = { [0] = i }
+    matrix[i][0] = i
+    for j = 1, len2 do matrix[i][j] = nil end
   end
 
   for j = 0, len2, 1 do
@@ -105,25 +135,38 @@ local function lev(str1, str2, limit)
 
   -- levenshtein algorithm
   for i = 1, len1, 1 do
-    best = limit
+    lev_best = limit
 
     for j = 1, len2, 1 do
       cost = string.byte(str1,i) == string.byte(str2,j) and 0 or 1
-      matrix[i][j] = math.min(matrix[i-1][j] + 1, matrix[i][j-1] + 1, matrix[i-1][j-1] + cost)
+      matrix[i][j] = min(matrix[i-1][j] + 1, matrix[i][j-1] + 1, matrix[i-1][j-1] + cost)
 
       if limit and matrix[i][j] < limit then
-        best = matrix[i][j]
+        lev_best = matrix[i][j]
       end
     end
 
-    if limit and best >= limit then
-      levcache[str1..":"..str2] = limit
+    if limit and lev_best >= limit then
+      -- evict cache if too large before adding
+      if levcache_count >= LEVCACHE_MAX then
+        levcache = {}
+        levcache_count = 0
+      end
+      levcache[key] = limit
+      levcache_count = levcache_count + 1
       return limit
     end
   end
 
+  -- evict cache if too large before adding
+  if levcache_count >= LEVCACHE_MAX then
+    levcache = {}
+    levcache_count = 0
+  end
+
   -- return the levenshtein distance
-  levcache[str1..":"..str2] = matrix[len1][len2]
+  levcache[key] = matrix[len1][len2]
+  levcache_count = levcache_count + 1
   return matrix[len1][len2]
 end
 
@@ -327,6 +370,23 @@ pfDatabase.Reload = function()
 end
 
 pfDatabase.Reload()
+
+-- Reusable parse_obj table (cleared and reused each SearchQuestID call)
+local parse_obj = { ["U"] = {}, ["O"] = {}, ["I"] = {} }
+local function clear_parse_obj()
+  for k in pairs(parse_obj["U"]) do parse_obj["U"][k] = nil end
+  for k in pairs(parse_obj["O"]) do parse_obj["O"][k] = nil end
+  for k in pairs(parse_obj["I"]) do parse_obj["I"][k] = nil end
+end
+
+-- Pre-defined vertex color tables (avoid creating new tables each quest)
+local VERTEX_BLACK = { 0, 0, 0 }
+local VERTEX_RED = { 1, .6, .6 }
+local VERTEX_WHITE = { 1, 1, 1 }
+local VERTEX_BLUE = { .2, .8, 1 }
+
+-- factionMap for GetRaceMaskByID (avoid recreation per call)
+local factionMap = {["A"]=77, ["H"]=178, ["AH"]=255, ["HA"]=255}
 
 local bitraces = {
   [1] = "Human",
@@ -554,9 +614,7 @@ end
 
 -- GetRaceMaskByID
 function pfDatabase:GetRaceMaskByID(id, db)
-  -- 64 + 8 + 4 + 1 = 77 = Alliance
-  -- 128 + 32 + 16 + 2 = 178 = Horde
-  local factionMap = {["A"]=77, ["H"]=178, ["AH"]=255, ["HA"]=255}
+  -- Uses module-level factionMap: A=77, H=178, AH/HA=255
   local raceMask = 0
 
   if db == "quests" then
@@ -1195,11 +1253,8 @@ function pfDatabase:SearchQuestID(id, meta, maps)
     end
   end
 
-  local parse_obj = {
-    ["U"] = {},
-    ["O"] = {},
-    ["I"] = {},
-  }
+  -- Clear and reuse the module-level parse_obj table
+  clear_parse_obj()
 
   -- If QuestLogID is given, scan and add all finished objectives to blacklist
   if meta["qlogid"] then
@@ -1478,27 +1533,27 @@ function pfDatabase:SearchQuests(meta, maps)
       meta["qlvl"] = quests[id]["lvl"]
       meta["qmin"] = quests[id]["min"]
 
-      meta["vertex"] = { 0, 0, 0 }
+      meta["vertex"] = VERTEX_BLACK
       meta["layer"] = 3
 
       -- tint high level quests red
       if quests[id]["min"] and quests[id]["min"] > plevel then
         meta["texture"] = pfQuestConfig.path.."\\img\\available"
-        meta["vertex"] = { 1, .6, .6 }
+        meta["vertex"] = VERTEX_RED
         meta["layer"] = 2
       end
 
       -- tint low level quests grey
       if quests[id]["lvl"] and quests[id]["lvl"] + 10 < plevel then
         meta["texture"] = pfQuestConfig.path.."\\img\\available"
-        meta["vertex"] = { 1, 1, 1 }
+        meta["vertex"] = VERTEX_WHITE
         meta["layer"] = 2
       end
 
       -- tint event quests as blue
       if quests[id]["event"] then
         meta["texture"] = pfQuestConfig.path.."\\img\\available"
-        meta["vertex"] = { .2, .8, 1 }
+        meta["vertex"] = VERTEX_BLUE
         meta["layer"] = 2
       end
 
@@ -1853,6 +1908,28 @@ function pfDatabase:ScanServer()
   pfServerScan:Show()
 end
 
+-- Pre-create frame and handler for QueryServer (avoid creating per call)
+local queryFrame
+local function OnQuestQueryComplete(self)
+  self:UnregisterEvent("QUEST_QUERY_COMPLETE")
+
+  -- Retrieve completed quests after the QUEST_QUERY_COMPLETE event
+  local completedQuests = GetQuestsCompleted()
+
+  if type(completedQuests) == "table" then
+    for questID, _ in pairs(completedQuests) do
+      pfQuest_history[questID] = { time(), UnitLevel("player") }
+    end
+
+    -- Reset all quest markers after processing completed quests
+    pfQuest:ResetAll()
+  elseif completedQuests == nil then
+    print("Error: GetQuestsCompleted() returned nil.")
+  else
+    print("Error: GetQuestsCompleted() did not return a valid table. Value: ", completedQuests)
+  end
+end
+
 function pfDatabase:QueryServer()
   -- break here on incompatible versions
   if not QueryQuestsCompleted then
@@ -1860,32 +1937,12 @@ function pfDatabase:QueryServer()
     return
   end
 
-  QueryQuestsCompleted()  -- Send the request to the server
-
-  local frame = CreateFrame("Frame")  -- Create a new frame
-  frame:RegisterEvent("QUEST_QUERY_COMPLETE")  -- Register the event on the frame
-
-  local function OnQuestQueryComplete()
-    frame:UnregisterEvent("QUEST_QUERY_COMPLETE")  -- Unregister the event once it's triggered
-
-    -- Retrieve completed quests after the QUEST_QUERY_COMPLETE event
-    local completedQuests = GetQuestsCompleted()
-
-    if type(completedQuests) == "table" then
-      for questID, _ in pairs(completedQuests) do
-        pfQuest_history[questID] = { time(), UnitLevel("player") }
-      end
-
-      -- Reset all quest markers after processing completed quests
-      pfQuest:ResetAll()
-    elseif completedQuests == nil then
-      -- Handle the case where GetQuestsCompleted() returned nil
-      print("Error: GetQuestsCompleted() returned nil.")
-    else
-      -- Handle the case where GetQuestsCompleted() did not return a valid table
-      print("Error: GetQuestsCompleted() did not return a valid table. Value: ", completedQuests)
-    end
+  -- Reuse frame instead of creating new one each call
+  if not queryFrame then
+    queryFrame = CreateFrame("Frame")
+    queryFrame:SetScript("OnEvent", OnQuestQueryComplete)
   end
 
-  frame:SetScript("OnEvent", OnQuestQueryComplete)  -- Set the event handler
+  queryFrame:RegisterEvent("QUEST_QUERY_COMPLETE")
+  QueryQuestsCompleted()
 end

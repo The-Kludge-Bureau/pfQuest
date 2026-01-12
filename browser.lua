@@ -1,11 +1,23 @@
 -- multi api compat
 local compat = pfQuestCompat
 
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local format = string.format
+local getn = table.getn
+local GetTime = GetTime
+
 -- default config
 pfBrowser_fav = {["units"] = {}, ["objects"] = {}, ["items"] = {}, ["quests"] = {}}
 
 local tooltip_limit = 5
 local search_limit = 512
+
+-- Reusable tooltip maps table (cleared and reused to avoid GC)
+local tooltip_maps = {}
+local function clear_tooltip_maps()
+  for k in pairs(tooltip_maps) do tooltip_maps[k] = nil end
+end
 
 -- add database shortcuts
 local items = pfDB["items"]["data"]
@@ -52,7 +64,9 @@ local function ResultButtonEnter()
   else
     local id = this.id
     local name = this.name
-    local maps = {}
+    -- Reuse tooltip_maps table instead of creating new one each hover
+    clear_tooltip_maps()
+    local maps = tooltip_maps
     GameTooltip:SetOwner(this, "ANCHOR_LEFT", -10, -5)
     GameTooltip:SetText(name, .3, 1, .8)
     if this.btype == "units" then
@@ -612,11 +626,19 @@ pfBrowser:SetScript("OnMouseUp",function()
 end)
 
 pfBrowser:SetScript("OnUpdate", function()
+  -- Throttle to 10 updates/sec instead of every frame (60+)
+  this.elapsed = (this.elapsed or 0) + arg1
+  if this.elapsed < 0.1 then return end
+  this.elapsed = 0
+
+  -- Cache GetMouseFocus to avoid multiple calls
+  local focus = GetMouseFocus()
+
   -- multi-select handling
-  if not this.selectState and IsControlKeyDown() and GetMouseFocus() and GetMouseFocus().pfResultButton then
+  if not this.selectState and IsControlKeyDown() and focus and focus.pfResultButton then
     for id, frame in pairs(pfBrowser.tabs) do
       for id, button in pairs(frame.buttons) do
-        if button.name == GetMouseFocus().name then
+        if button.name == focus.name then
           button.tex:SetTexture(.3,1,.8,.4)
         end
       end

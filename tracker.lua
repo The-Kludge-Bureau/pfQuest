@@ -1,6 +1,12 @@
 -- multi api compat
 local compat = pfQuestCompat
 
+-- Performance: cache frequently-used globals
+local pairs = pairs
+local min, max = math.min, math.max
+local getn, sort = table.getn, table.sort
+local GetTime = GetTime
+
 local fontsize = 12
 local panelheight = 16
 local entryheight = 20
@@ -449,10 +455,18 @@ function tracker.ButtonEvent(self)
     self.tooltip = pfQuest_Loc["|cff33ffcc<Ctrl-Click>|r Show Map / Toggle Color\n|cff33ffcc<Shift-Click>|r Hide Nodes"]
   end
 
-  -- sort all tracker entries
-  table.sort(tracker.buttons, trackersort)
-
+  -- Mark for sort instead of sorting immediately (deferred)
+  tracker.needsSort = true
   self:Show()
+end
+
+-- Separate function for layout (only called when needed)
+function tracker.DoLayout()
+  -- Sort all tracker entries if needed
+  if tracker.needsSort then
+    sort(tracker.buttons, trackersort)
+    tracker.needsSort = nil
+  end
 
   -- resize window and align buttons
   local height = panelheight
@@ -465,13 +479,18 @@ function tracker.ButtonEvent(self)
     if not button.empty then
       height = height + button:GetHeight()
 
-      if button.text:GetStringWidth() > width then
-        width = button.text:GetStringWidth()
+      -- Cache GetStringWidth result (avoid calling twice)
+      local textWidth = button.text:GetStringWidth()
+      if textWidth > width then
+        width = textWidth
       end
 
       for id, objective in pairs(button.objectives) do
-        if objective:IsShown() and objective:GetStringWidth() > width then
-          width = objective:GetStringWidth()
+        if objective:IsShown() then
+          local objWidth = objective:GetStringWidth()
+          if objWidth > width then
+            width = objWidth
+          end
         end
       end
     end
@@ -615,6 +634,7 @@ function tracker.Reset()
       end
     end
   end
+  -- Note: DoLayout is called by UpdateNodes after all ButtonAdd calls complete
 end
 
 -- make global available
