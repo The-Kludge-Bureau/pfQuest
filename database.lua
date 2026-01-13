@@ -206,6 +206,36 @@ for id, db in pairs(dbs) do
   pfDatabase.dbstring = pfDatabase.dbstring .. " |cffcccccc[|cffffffff" .. db .. "|cffcccccc:|cff33ffcc" .. ( pfDB[db][loc] and loc or "enUS" ) .. "|cffcccccc]"
 end
 
+-- Free unused locale data to reduce memory (~65MB savings)
+-- The "loc" reference already points to the correct table, so we can safely
+-- nil out all other locale tables and let them be garbage collected
+for id, db in pairs(dbs) do
+  for locale in pairs(pfDB.locales) do
+    if pfDB[db][locale] and pfDB[db][locale] ~= pfDB[db]["loc"] then
+      pfDB[db][locale] = nil
+    end
+  end
+  -- Also free enUS if it's not the active locale (enUS may not be in pfDB.locales)
+  if pfDB[db]["enUS"] and pfDB[db]["enUS"] ~= pfDB[db]["loc"] then
+    pfDB[db]["enUS"] = nil
+  end
+  -- Free expansion patch data (already merged into base tables)
+  pfDB[db]["data-tbc"] = nil
+  pfDB[db]["data-wotlk"] = nil
+  for locale in pairs(pfDB.locales) do
+    pfDB[db][locale.."-tbc"] = nil
+    pfDB[db][locale.."-wotlk"] = nil
+  end
+  pfDB[db]["enUS-tbc"] = nil
+  pfDB[db]["enUS-wotlk"] = nil
+end
+
+-- Free expansion meta/minimap tables (already merged)
+pfDB["minimap-tbc"] = nil
+pfDB["minimap-wotlk"] = nil
+pfDB["meta-tbc"] = nil
+pfDB["meta-wotlk"] = nil
+
 -- track all previous meta selections on login
 pfDatabase.tracking = CreateFrame("Frame", "pfDatabaseMetaTracking", UIParent)
 pfDatabase.tracking:RegisterEvent("PLAYER_ENTERING_WORLD")
