@@ -35,6 +35,11 @@ if not pfUI then
   pfUI.api.emulated = true
 end
 
+-- Ensure font_default has a valid fallback (real pfUI may not set it, or STANDARD_TEXT_FONT may be nil)
+if not pfUI.font_default then
+  pfUI.font_default = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+end
+
 pfUI.api.SetButtonFont = pfUI.api.SetButtonFont or function(button, font, size, flags)
   if button.SetFont then
     -- vanilla + tbc
