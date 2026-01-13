@@ -181,30 +181,6 @@ pfQuestConfig:SetFrameStrata("HIGH")
 pfQuestConfig:SetMovable(true)
 pfQuestConfig:EnableMouse(true)
 pfQuestConfig:SetClampedToScreen(true)
-pfQuestConfig:RegisterEvent("ADDON_LOADED")
-pfQuestConfig:SetScript("OnEvent", function()
-  if arg1 == "pfQuest" or arg1 == "pfQuest-tbc" or arg1 == "pfQuest-wotlk" then
-    pfQuestConfig:LoadConfig()
-    pfQuestConfig:MigrateHistory()
-    pfQuestConfig:CreateConfigEntries(pfQuest_defconfig)
-
-    pfQuest_questcache = pfQuest_questcache or {}
-    pfQuest_history = pfQuest_history or {}
-    pfQuest_colors = pfQuest_colors or {}
-    pfQuest_config = pfQuest_config or {}
-    pfQuest_track = pfQuest_track or {}
-    pfBrowser_fav = pfBrowser_fav or {["units"] = {}, ["objects"] = {}, ["items"] = {}, ["quests"] = {}}
-
-    -- clear quest history on new characters
-    if UnitXP("player") == 0 and UnitLevel("player") == 1 then
-      pfQuest_history = {}
-    end
-
-    if pfBrowserIcon and pfQuest_config["minimapbutton"] == "0" then
-      pfBrowserIcon:Hide()
-    end
-  end
-end)
 
 pfQuestConfig:SetScript("OnMouseDown", function()
   this:StartMoving()
@@ -463,6 +439,33 @@ function pfQuestConfig:UpdateConfigEntries()
     end
   end
 end
+
+-- Register ADDON_LOADED event handler after all methods are defined
+-- This ensures LoadConfig, MigrateHistory, CreateConfigEntries exist when called
+pfQuestConfig:RegisterEvent("ADDON_LOADED")
+pfQuestConfig:SetScript("OnEvent", function()
+  if arg1 == "pfQuest" or arg1 == "pfQuest-tbc" or arg1 == "pfQuest-wotlk" then
+    pfQuestConfig:LoadConfig()
+    pfQuestConfig:MigrateHistory()
+    pfQuestConfig:CreateConfigEntries(pfQuest_defconfig)
+
+    pfQuest_questcache = pfQuest_questcache or {}
+    pfQuest_history = pfQuest_history or {}
+    pfQuest_colors = pfQuest_colors or {}
+    pfQuest_config = pfQuest_config or {}
+    pfQuest_track = pfQuest_track or {}
+    pfBrowser_fav = pfBrowser_fav or {["units"] = {}, ["objects"] = {}, ["items"] = {}, ["quests"] = {}}
+
+    -- clear quest history on new characters
+    if UnitXP("player") == 0 and UnitLevel("player") == 1 then
+      pfQuest_history = {}
+    end
+
+    if pfBrowserIcon and pfQuest_config["minimapbutton"] == "0" then
+      pfBrowserIcon:Hide()
+    end
+  end
+end)
 
 do -- welcome/init popup dialog
   local config_stage = {
