@@ -15,6 +15,15 @@ local GetTime = GetTime
 local UnitLevel, UnitRace, UnitClass = UnitLevel, UnitRace, UnitClass
 local UnitFactionGroup, UnitName, UnitSex = UnitFactionGroup, UnitName, UnitSex
 
+-- Ensure pfQuestConfig.path exists (fallback if config.lua failed to set it)
+if not pfQuestConfig then
+  pfQuestConfig = CreateFrame("Frame", "pfQuestConfig", UIParent)
+  pfQuestConfig:Hide()
+end
+if not pfQuestConfig.path then
+  pfQuestConfig.path = "Interface\\AddOns\\pfQuest"
+end
+
 pfDatabase = { icons = {} }
 
 local loc = GetLocale()
