@@ -27,19 +27,6 @@ end
 pfDatabase = { icons = {} }
 
 local loc = GetLocale()
-
--- Load the locale addon on-demand (lazy loading to reduce memory)
-local localeAddon = "pfQuest-locale-" .. loc
-local loaded, reason = LoadAddOn(localeAddon)
-if not loaded then
-  -- Try enUS as fallback
-  localeAddon = "pfQuest-locale-enUS"
-  loaded, reason = LoadAddOn(localeAddon)
-  if not loaded then
-    DEFAULT_CHAT_FRAME:AddMessage("|cff33ffccpf|cffffffffQuest: |cffff5555Warning - Could not load locale addon: " .. (reason or "unknown"))
-  end
-end
-
 local dbs = { "items", "quests", "quests-itemreq", "objects", "units", "zones", "professions", "areatrigger", "refloot" }
 local noloc = { items = true, quests = true, objects = true, units = true }
 
@@ -229,13 +216,26 @@ for id, db in pairs(dbs) do
   pfDatabase.dbstring = pfDatabase.dbstring .. " |cffcccccc[|cffffffff" .. db .. "|cffcccccc:|cff33ffcc" .. ( pfDB[db][loc] and loc or "enUS" ) .. "|cffcccccc]"
 end
 
--- Free expansion patch data (already merged into base tables)
--- Note: With lazy-loaded locales, only one locale is loaded, so no need to free others
+-- Free unused locale data to reduce memory (~65MB savings)
+-- The "loc" reference already points to the correct table, so we can safely
+-- nil out all other locale tables and let them be garbage collected
 for id, db in pairs(dbs) do
+  for locale in pairs(pfDB.locales) do
+    if pfDB[db][locale] and pfDB[db][locale] ~= pfDB[db]["loc"] then
+      pfDB[db][locale] = nil
+    end
+  end
+  -- Also free enUS if it's not the active locale (enUS may not be in pfDB.locales)
+  if pfDB[db]["enUS"] and pfDB[db]["enUS"] ~= pfDB[db]["loc"] then
+    pfDB[db]["enUS"] = nil
+  end
+  -- Free expansion patch data (already merged into base tables)
   pfDB[db]["data-tbc"] = nil
   pfDB[db]["data-wotlk"] = nil
-  pfDB[db][loc.."-tbc"] = nil
-  pfDB[db][loc.."-wotlk"] = nil
+  for locale in pairs(pfDB.locales) do
+    pfDB[db][locale.."-tbc"] = nil
+    pfDB[db][locale.."-wotlk"] = nil
+  end
   pfDB[db]["enUS-tbc"] = nil
   pfDB[db]["enUS-wotlk"] = nil
 end
