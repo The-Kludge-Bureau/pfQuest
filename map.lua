@@ -946,7 +946,9 @@ function pfMap:UpdateNodes()
   end
 
   -- Perform tracker layout once after all ButtonAdd calls complete
-  pfQuest.tracker.DoLayout()
+  if pfQuest.tracker and pfQuest.tracker.DoLayout then
+    pfQuest.tracker.DoLayout()
+  end
 end
 
 function pfMap:UpdateMinimap()
