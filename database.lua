@@ -125,6 +125,7 @@ local function lev(str1, str2, limit)
   -- initialise the base matrix (reuse pre-allocated matrix)
   local matrix = lev_matrix
   for i = 0, len1, 1 do
+    if not matrix[i] then matrix[i] = {} end
     matrix[i][0] = i
     for j = 1, len2 do matrix[i][j] = nil end
   end
