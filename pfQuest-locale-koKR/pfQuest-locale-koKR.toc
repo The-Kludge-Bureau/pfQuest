@@ -1,0 +1,18 @@
+## Interface: 11200
+## Title: |cff33ffccpf|cffffffffQuest |cffcccccc[koKR]
+## Notes: Korean locale data for pfQuest
+## LoadOnDemand: 1
+## Dependencies: pfQuest
+
+..\db\koKR\items.lua
+..\db\koKR\units.lua
+..\db\koKR\objects.lua
+..\db\koKR\quests.lua
+..\db\koKR\zones.lua
+..\db\koKR\professions.lua
+..\db\koKR\items-tbc.lua
+..\db\koKR\units-tbc.lua
+..\db\koKR\objects-tbc.lua
+..\db\koKR\quests-tbc.lua
+..\db\koKR\zones-tbc.lua
+..\db\koKR\professions-tbc.lua

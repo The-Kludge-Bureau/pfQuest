@@ -1,0 +1,18 @@
+## Interface: 11200
+## Title: |cff33ffccpf|cffffffffQuest |cffcccccc[esES]
+## Notes: Spanish locale data for pfQuest
+## LoadOnDemand: 1
+## Dependencies: pfQuest
+
+..\db\esES\items.lua
+..\db\esES\units.lua
+..\db\esES\objects.lua
+..\db\esES\quests.lua
+..\db\esES\zones.lua
+..\db\esES\professions.lua
+..\db\esES\items-tbc.lua
+..\db\esES\units-tbc.lua
+..\db\esES\objects-tbc.lua
+..\db\esES\quests-tbc.lua
+..\db\esES\zones-tbc.lua
+..\db\esES\professions-tbc.lua

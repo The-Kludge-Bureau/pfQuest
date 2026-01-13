@@ -1,0 +1,18 @@
+## Interface: 11200
+## Title: |cff33ffccpf|cffffffffQuest |cffcccccc[ruRU]
+## Notes: Russian locale data for pfQuest
+## LoadOnDemand: 1
+## Dependencies: pfQuest
+
+..\db\ruRU\items.lua
+..\db\ruRU\units.lua
+..\db\ruRU\objects.lua
+..\db\ruRU\quests.lua
+..\db\ruRU\zones.lua
+..\db\ruRU\professions.lua
+..\db\ruRU\items-tbc.lua
+..\db\ruRU\units-tbc.lua
+..\db\ruRU\objects-tbc.lua
+..\db\ruRU\quests-tbc.lua
+..\db\ruRU\zones-tbc.lua
+..\db\ruRU\professions-tbc.lua
