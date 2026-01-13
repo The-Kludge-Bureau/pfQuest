@@ -85,27 +85,30 @@ local function IsEmpty(tabl)
   return true
 end
 
+-- Ensure pfQuestConfig.path exists (fallback if config.lua failed)
+local addon_path = (pfQuestConfig and pfQuestConfig.path) or "Interface\\AddOns\\pfQuest"
+
 local layers = {
   -- regular icons
-  [pfQuestConfig.path.."\\img\\available"]          = 1,
-  [pfQuestConfig.path.."\\img\\available_c"]        = 2,
-  [pfQuestConfig.path.."\\img\\complete"]           = 3,
-  [pfQuestConfig.path.."\\img\\complete_c"]         = 4,
-  [pfQuestConfig.path.."\\img\\icon_vendor"]        = 5,
-  [pfQuestConfig.path.."\\img\\fav"]                = 6,
+  [addon_path.."\\img\\available"]          = 1,
+  [addon_path.."\\img\\available_c"]        = 2,
+  [addon_path.."\\img\\complete"]           = 3,
+  [addon_path.."\\img\\complete_c"]         = 4,
+  [addon_path.."\\img\\icon_vendor"]        = 5,
+  [addon_path.."\\img\\fav"]                = 6,
 
   -- cluster textures
-  [pfQuestConfig.path.."\\img\\cluster_item"]       = 9,
-  [pfQuestConfig.path.."\\img\\cluster_mob"]        = 9,
-  [pfQuestConfig.path.."\\img\\cluster_misc"]       = 9,
-  [pfQuestConfig.path.."\\img\\cluster_mob_mono"]   = 9,
-  [pfQuestConfig.path.."\\img\\cluster_item_mono"]  = 9,
-  [pfQuestConfig.path.."\\img\\cluster_misc_mono"]  = 9,
+  [addon_path.."\\img\\cluster_item"]       = 9,
+  [addon_path.."\\img\\cluster_mob"]        = 9,
+  [addon_path.."\\img\\cluster_misc"]       = 9,
+  [addon_path.."\\img\\cluster_mob_mono"]   = 9,
+  [addon_path.."\\img\\cluster_item_mono"]  = 9,
+  [addon_path.."\\img\\cluster_misc_mono"]  = 9,
 }
 
 -- Pre-computed texture paths (avoid string concatenation in hot paths)
-local TEX_NODECUT = pfQuestConfig.path.."\\img\\nodecut"
-local TEX_NODE = pfQuestConfig.path.."\\img\\node"
+local TEX_NODECUT = addon_path.."\\img\\nodecut"
+local TEX_NODE = addon_path.."\\img\\node"
 
 local function GetLayerByTexture(tex)
   if layers[tex] then return layers[tex] else return 1 end
