@@ -224,7 +224,7 @@ pfUI.api.CreateBackdrop(pfQuestConfig, nil, true, 0.75)
 table.insert(UISpecialFrames, "pfQuestConfig")
 
 -- detect current addon path
-local tocs = { "", "-master", "-tbc", "-wotlk" }
+local tocs = { "", "-master", "-tbc", "-wotlk", "-turtle" }
 for _, name in pairs(tocs) do
   local current = string.format("pfQuest%s", name)
   local _, title = GetAddOnInfo(current)
@@ -233,6 +233,12 @@ for _, name in pairs(tocs) do
     pfQuestConfig.version = tostring(GetAddOnMetadata(current, "Version"))
     break
   end
+end
+
+-- fallback if no matching addon found
+if not pfQuestConfig.path then
+  pfQuestConfig.path = "Interface\\AddOns\\pfQuest"
+  pfQuestConfig.version = "unknown"
 end
 
 pfQuestConfig.title = pfQuestConfig:CreateFontString("Status", "LOW", "GameFontNormal")
