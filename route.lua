@@ -1,7 +1,8 @@
 -- Performance: cache frequently-used globals
 local pairs = pairs
 local floor, ceil, sqrt, abs = math.floor, math.ceil, math.sqrt, math.abs
-local sin, cos, atan2, rad, pi = math.sin, math.cos, math.atan2, math.rad, math.pi
+local sin, cos, rad, pi = math.sin, math.cos, math.rad, math.pi
+-- Note: WoW's global atan2 returns degrees (not radians like math.atan2)
 local min, max = math.min, math.max
 local getn, insert, sort = table.getn, table.insert, table.sort
 local GetTime = GetTime
