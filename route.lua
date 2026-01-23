@@ -2,7 +2,8 @@
 local pairs = pairs
 local floor, ceil, sqrt, abs = math.floor, math.ceil, math.sqrt, math.abs
 local sin, cos, rad, pi = math.sin, math.cos, math.rad, math.pi
--- Note: WoW's global atan2 returns degrees (not radians like math.atan2)
+-- WoW's global atan2 returns degrees; fallback for clients without it
+local atan2 = atan2 or function(x, y) return math.deg(math.atan2(x, y)) end
 local min, max = math.min, math.max
 local getn, insert, sort = table.getn, table.insert, table.sort
 local GetTime = GetTime
