@@ -167,6 +167,12 @@ pfQuest:SetScript("OnUpdate", function()
   -- process queue
   for id, entry in pairs(this.queue) do
 
+    -- questgivers only need refreshing when quests are added or removed,
+    -- not when objectives change (RELOAD). track this before clearing the entry.
+    if entry[4] == "NEW" or entry[4] == "REMOVE" then
+      this.needsQuestGiverUpdate = true
+    end
+
     -- remove quest
     if entry[4] == "REMOVE" then
       pfQuest:Debug("|cffff5555Remove Quest: " .. entry[1] .. " (" .. entry[2] .. ")")
@@ -208,7 +214,7 @@ pfQuest:SetScript("OnUpdate", function()
           pfMap:DeleteNode("PFQUEST", pfDB["quests"]["loc"][entry[2]].T)
         end
 
-        -- skip quest objective detection on manual and tacked mode
+        -- skip quest objective detection on manual and tracked mode
         if pfQuest_config["trackingmethod"] ~= 3 and
           (pfQuest_config["trackingmethod"] ~= 2 or IsQuestWatched(entry[3]))
         then
@@ -216,12 +222,6 @@ pfQuest:SetScript("OnUpdate", function()
           pfDatabase:SearchQuestID(entry[2], meta)
         end
       end
-    end
-
-    -- questgivers only need refreshing when quests are added or removed,
-    -- not when objectives change (RELOAD). track this before clearing the entry.
-    if entry[4] == "NEW" or entry[4] == "REMOVE" then
-      this.needsQuestGiverUpdate = true
     end
 
     -- remove entry from queue and decrement counter

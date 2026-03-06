@@ -387,6 +387,7 @@ CreateFrame("Frame", "pfQuestLocaleCheck", UIParent):SetScript("OnUpdate", funct
       end
 
       pfDatabase.localized = true
+      pfDatabase:BuildNameIndex()
       this:Hide()
     end
   end
@@ -394,6 +395,7 @@ CreateFrame("Frame", "pfQuestLocaleCheck", UIParent):SetScript("OnUpdate", funct
   -- set a detection timeout to 15 seconds
   if GetTime() > 15 then
     pfDatabase.localized = true
+    pfDatabase:BuildNameIndex()
     this:Hide()
   end
 end)
@@ -425,6 +427,33 @@ pfDatabase.Reload = function()
 end
 
 pfDatabase.Reload()
+
+-- Inverted name index: maps name → {id, id, ...} for O(1) exact-match lookups.
+-- Built once after locale is known. Used by GetIDByName to skip full-table scans
+-- for exact matches (the hot path in SearchQuestID). Partial-match calls (browser,
+-- slash commands) still use the full scan since they can't use this index.
+pfDatabase.nameIndex = {}
+
+function pfDatabase:BuildNameIndex()
+  local idx = self.nameIndex
+  -- clear existing index in-place
+  for db in pairs(idx) do
+    for name in pairs(idx[db]) do idx[db][name] = nil end
+    idx[db] = nil
+  end
+
+  for _, db in pairs({"units", "objects", "items"}) do
+    idx[db] = {}
+    for id, loc in pairs(pfDB[db]["loc"]) do
+      if loc then
+        if not idx[db][loc] then idx[db][loc] = {} end
+        insert(idx[db][loc], id)
+      end
+    end
+  end
+end
+
+pfDatabase:BuildNameIndex()
 
 -- Reusable parse_obj table (cleared and reused each SearchQuestID call)
 local parse_obj = { ["U"] = {}, ["O"] = {}, ["I"] = {} }
@@ -715,6 +744,21 @@ function pfDatabase:GetIDByName(name, db, partial, server)
   if not pfDB[db] then return nil end
   local ret = {}
 
+  -- Fast path: O(1) index lookup for exact case-sensitive matches with no
+  -- server filter. This is the hot path called from SearchQuestID for monster
+  -- and item objective lookups. Quests are excluded because their loc is a
+  -- table ({T=, O=, D=}) and are not indexed.
+  if not partial and not server and db ~= "quests" then
+    local ids = pfDatabase.nameIndex[db] and pfDatabase.nameIndex[db][name]
+    if ids then
+      for _, id in pairs(ids) do
+        ret[id] = pfDB[db]["loc"][id]
+      end
+    end
+    return ret
+  end
+
+  -- Slow path: full scan for partial matches (browser/slash commands) and quests
   for id, loc in pairs(pfDB[db]["loc"]) do
     if db == "quests" then loc = loc["T"] end
 
@@ -1259,6 +1303,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
       end
     end
 
+
     -- search quest-ender
     if quests[id]["end"] then
       -- units
@@ -1308,6 +1353,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
     end
   end
 
+
   -- Clear and reuse the module-level parse_obj table
   clear_parse_obj()
 
@@ -1343,6 +1389,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
       end
     end
   end
+
 
   -- search quest-objectives
   if quests[id]["obj"] then
@@ -1392,6 +1439,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
       end
     end
 
+
     -- units
     if quests[id]["obj"]["U"] then
       for _, unit in pairs(quests[id]["obj"]["U"]) do
@@ -1405,6 +1453,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
         end
       end
     end
+
 
     -- objects
     if quests[id]["obj"]["O"] then
@@ -1420,6 +1469,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
         end
       end
     end
+
 
     -- items
     if quests[id]["obj"]["I"] then
@@ -1438,6 +1488,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
       end
     end
 
+
     -- areatrigger
     if quests[id]["obj"]["A"] then
       for _, areatrigger in pairs(quests[id]["obj"]["A"]) do
@@ -1448,6 +1499,7 @@ function pfDatabase:SearchQuestID(id, meta, maps)
         maps = pfDatabase:SearchAreaTriggerID(areatrigger, meta, maps)
       end
     end
+
 
     -- zones
     if quests[id]["obj"]["Z"] then
