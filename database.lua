@@ -435,6 +435,12 @@ pfDatabase.Reload()
 pfDatabase.nameIndex = {}
 pfDatabase.lastQuestGiversSet = {}
 
+-- Pre-computed set of quest IDs that will never pass QuestFilter for this
+-- character, regardless of level, questlog, or config changes.
+-- Populated by BuildStaticRejectSet (called from BuildNameIndex).
+-- Covers: wrong race, wrong class, missing loc name.
+pfDatabase.staticRejectSet = {}
+
 function pfDatabase:BuildNameIndex()
   local idx = self.nameIndex
   -- clear existing index in-place
@@ -455,6 +461,42 @@ function pfDatabase:BuildNameIndex()
 
   -- locale tables may have changed; force SearchQuests to re-add all nodes
   for id in pairs(self.lastQuestGiversSet) do self.lastQuestGiversSet[id] = nil end
+
+  -- rebuild static reject set now that loc tables are final
+  pfDatabase:BuildStaticRejectSet()
+end
+
+-- BuildStaticRejectSet
+-- Pre-computes the set of quest IDs that can never pass QuestFilter for this
+-- character, independent of level, questlog, history, config, or skills.
+-- Called once from BuildNameIndex (fires at load and on locale swap).
+-- Checks: wrong race bitmask, wrong class bitmask, missing loc name.
+function pfDatabase:BuildStaticRejectSet()
+  local reject = self.staticRejectSet
+  for id in pairs(reject) do reject[id] = nil end
+
+  -- UnitRace/UnitClass may return nil before PLAYER_ENTERING_WORLD.
+  -- In that case skip race/class checks; BuildNameIndex is called again
+  -- from the locale-detection OnUpdate after login, which will populate them.
+  local _, race  = UnitRace("player")
+  local _, class = UnitClass("player")
+  local prace    = race  and pfDatabase:GetBitByRace(race)  or nil
+  local pclass   = class and pfDatabase:GetBitByClass(class) or nil
+
+  for id in pairs(quests) do
+    -- missing loc name
+    if not pfDB.quests.loc[id] or not pfDB.quests.loc[id].T then
+      reject[id] = true
+
+    -- wrong race (only when prace is known)
+    elseif prace and quests[id]["race"] and not ( bit.band(quests[id]["race"], prace) == prace ) then
+      reject[id] = true
+
+    -- wrong class (only when pclass is known)
+    elseif pclass and quests[id]["class"] and not ( bit.band(quests[id]["class"], pclass) == pclass ) then
+      reject[id] = true
+    end
+  end
 end
 
 pfDatabase:BuildNameIndex()
@@ -1555,14 +1597,15 @@ function pfDatabase:SearchQuest(quest, meta, partial)
 end
 
 function pfDatabase:QuestFilter(id, plevel, pclass, prace)
+  -- fast reject: race, class, and missing loc name are session-constants,
+  -- pre-computed in BuildStaticRejectSet to avoid repeating bit ops per call
+  if pfDatabase.staticRejectSet[id] then return end
+
   -- hide active quest
   if pfQuest.questlog[id] then return end
 
   -- hide completed quests
   if pfQuest_history[id] then return end
-
-  -- hide broken quests without names
-  if not pfDB.quests.loc[id] or not pfDB.quests.loc[id].T then return end
 
   -- hide missing pre-quests
   if quests[id]["pre"] then
@@ -1578,7 +1621,8 @@ function pfDatabase:QuestFilter(id, plevel, pclass, prace)
     if not one_complete then return end
   end
 
-  -- hide non-available quests for your race
+  -- hide non-available quests for your race (redundant when staticRejectSet is warm,
+  -- retained as fallback for the brief window before locale detection completes)
   if quests[id]["race"] and not ( bit.band(quests[id]["race"], prace) == prace ) then return end
 
   -- hide non-available quests for your class
@@ -1654,12 +1698,17 @@ function pfDatabase:SearchQuests(meta, maps)
 
   -- Phase 1: build the full set of quests that currently pass the filter.
   -- This loop is unavoidable but is the only O(all_quests) work we do.
+  -- Static rejects (wrong race/class, missing name) are skipped before
+  -- calling QuestFilter to avoid the function call overhead entirely.
   local currentSet = {}
+  local staticReject = self.staticRejectSet
   for id in pairs(quests) do
-    local tf0 = GetTime()
-    local pass = pfDatabase:QuestFilter(id, plevel, pclass, prace)
-    t_filter = t_filter + (GetTime() - tf0)
-    if pass then currentSet[id] = true end
+    if not staticReject[id] then
+      local tf0 = GetTime()
+      local pass = pfDatabase:QuestFilter(id, plevel, pclass, prace)
+      t_filter = t_filter + (GetTime() - tf0)
+      if pass then currentSet[id] = true end
+    end
   end
 
   -- Phase 2: remove nodes for quests that left the passing set.
