@@ -1539,8 +1539,8 @@ function pfDatabase:QuestFilter(id, plevel, pclass, prace)
   -- hide non-available quests for your class
   if quests[id]["class"] and not ( bit.band(quests[id]["class"], pclass) == pclass ) then return end
 
-  -- hide non-available quests for your profession
-  if quests[id]["skill"] and not pfDatabase:GetPlayerSkill(quests[id]["skill"]) then return end
+  -- hide non-available quests for your profession (uses cache when inside SearchQuests)
+  if quests[id]["skill"] and not pfDatabase:GetPlayerSkillCached(quests[id]["skill"]) then return end
 
   -- hide lowlevel quests
   if quests[id]["lvl"] and quests[id]["lvl"] < plevel - 4 and pfQuest_config["showlowlevel"] == "0" then return end
@@ -1552,6 +1552,52 @@ function pfDatabase:QuestFilter(id, plevel, pclass, prace)
   if quests[id]["event"] and pfQuest_config["showfestival"] == "0" then return end
 
   return true
+end
+
+-- SearchQuests skill cache: built once per SearchQuests call, used by QuestFilter
+-- via pfDatabase:GetPlayerSkillCached(). Avoids scanning all skill lines per quest.
+pfDatabase.skillcache = {}
+function pfDatabase:BuildSkillCache()
+  for k in pairs(self.skillcache) do self.skillcache[k] = nil end
+  for i = 0, GetNumSkillLines() do
+    local skillName, _, _, skillRank = GetSkillLineInfo(i)
+    if skillName then self.skillcache[skillName] = skillRank end
+  end
+end
+
+function pfDatabase:GetPlayerSkillCached(skill)
+  if not professions[skill] then return false end
+  local rank = self.skillcache[professions[skill]]
+  return rank or false
+end
+
+-- SearchQuests fingerprint: skip the full scan if nothing affecting questgiver
+-- visibility has actually changed since the last run.
+pfDatabase.questgiverFingerprint = ""
+local function buildQuestgiverFingerprint(plevel, pfaction, prace, pclass)
+  -- skill state is already in skillstate (quest.lua) but we need it here too;
+  -- we snapshot it from the skill cache we just built.
+  local skillParts = {}
+  for name, rank in pairs(pfDatabase.skillcache) do
+    insert(skillParts, name .. rank)
+  end
+  table.sort(skillParts)
+
+  -- history and questlog keys give us a cheap change signal
+  local logParts = {}
+  for qid in pairs(pfQuest.questlog) do insert(logParts, qid) end
+  table.sort(logParts)
+  local histParts = {}
+  for qid in pairs(pfQuest_history) do insert(histParts, qid) end
+  table.sort(histParts)
+
+  return plevel .. pfaction .. prace .. pclass
+    .. table.concat(skillParts, ",")
+    .. "|" .. table.concat(logParts, ",")
+    .. "|" .. table.concat(histParts, ",")
+    .. "|" .. (pfQuest_config["showlowlevel"] or "")
+    .. "|" .. (pfQuest_config["showhighlevel"] or "")
+    .. "|" .. (pfQuest_config["showfestival"] or "")
 end
 
 -- SearchQuests
@@ -1577,6 +1623,17 @@ function pfDatabase:SearchQuests(meta, maps)
   local prace = pfDatabase:GetBitByRace(race)
   local _, class = UnitClass("player")
   local pclass = pfDatabase:GetBitByClass(class)
+
+  -- build skill cache once for this entire scan (used by QuestFilter below)
+  pfDatabase:BuildSkillCache()
+
+  -- build fingerprint and skip the full scan if nothing has changed
+  local fingerprint = buildQuestgiverFingerprint(plevel, pfaction, prace, pclass)
+  if fingerprint == pfDatabase.questgiverFingerprint then
+    pfQuest:Debug("|cffaaaaaaSearchQuests skipped (no changes)")
+    return maps
+  end
+  pfDatabase.questgiverFingerprint = fingerprint
 
   for id in pairs(quests) do
     if pfDatabase:QuestFilter(id, plevel, pclass, prace) then

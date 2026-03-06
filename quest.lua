@@ -218,6 +218,12 @@ pfQuest:SetScript("OnUpdate", function()
       end
     end
 
+    -- questgivers only need refreshing when quests are added or removed,
+    -- not when objectives change (RELOAD). track this before clearing the entry.
+    if entry[4] == "NEW" or entry[4] == "REMOVE" then
+      this.needsQuestGiverUpdate = true
+    end
+
     -- remove entry from queue and decrement counter
     pfQuest.queue[id] = nil
     pfQuest.queueCount = pfQuest.queueCount - 1
@@ -229,10 +235,13 @@ pfQuest:SetScript("OnUpdate", function()
     end
   end
 
-  -- trigger questgiver update
+  -- trigger questgiver update only when needed
   if pfQuest.queueCount == 0 then
     this.updateQuestLog = true
-    this.updateQuestGivers = true
+    if this.needsQuestGiverUpdate then
+      this.updateQuestGivers = true
+      this.needsQuestGiverUpdate = false
+    end
   end
 end)
 
@@ -331,6 +340,8 @@ function pfQuest:ResetAll()
   pfQuest.questlog = {}
   pfQuest.updateQuestLog = true
   pfQuest.updateQuestGivers = true
+  -- invalidate the SearchQuests fingerprint so the next scan always runs
+  if pfDatabase then pfDatabase.questgiverFingerprint = "" end
 end
 
 -- register popup dialog to copy urls
