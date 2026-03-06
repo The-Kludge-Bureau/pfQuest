@@ -253,6 +253,10 @@ pfDatabase.tracking:SetScript("OnEvent", function()
   -- break on empty config
   if not pfQuest_track then return end
 
+  -- build static reject set now that all addon Lua is loaded and
+  -- UnitRace/UnitClass/GetBitByRace are all available
+  pfDatabase:BuildStaticRejectSet()
+
   -- enable all tracked
   for name, data in pairs(pfQuest_track) do
     pfDatabase:SearchMetaRelation(data[1], data[2])
@@ -388,6 +392,7 @@ CreateFrame("Frame", "pfQuestLocaleCheck", UIParent):SetScript("OnUpdate", funct
 
       pfDatabase.localized = true
       pfDatabase:BuildNameIndex()
+      pfDatabase:BuildStaticRejectSet()
       this:Hide()
     end
   end
@@ -396,6 +401,7 @@ CreateFrame("Frame", "pfQuestLocaleCheck", UIParent):SetScript("OnUpdate", funct
   if GetTime() > 15 then
     pfDatabase.localized = true
     pfDatabase:BuildNameIndex()
+    pfDatabase:BuildStaticRejectSet()
     this:Hide()
   end
 end)
@@ -437,7 +443,8 @@ pfDatabase.lastQuestGiversSet = {}
 
 -- Pre-computed set of quest IDs that will never pass QuestFilter for this
 -- character, regardless of level, questlog, or config changes.
--- Populated by BuildStaticRejectSet (called from BuildNameIndex).
+-- Populated by BuildStaticRejectSet, called from PLAYER_ENTERING_WORLD
+-- and from the locale-detection OnUpdate (covers locale swaps).
 -- Covers: wrong race, wrong class, missing loc name.
 pfDatabase.staticRejectSet = {}
 
@@ -461,15 +468,13 @@ function pfDatabase:BuildNameIndex()
 
   -- locale tables may have changed; force SearchQuests to re-add all nodes
   for id in pairs(self.lastQuestGiversSet) do self.lastQuestGiversSet[id] = nil end
-
-  -- rebuild static reject set now that loc tables are final
-  pfDatabase:BuildStaticRejectSet()
 end
 
 -- BuildStaticRejectSet
 -- Pre-computes the set of quest IDs that can never pass QuestFilter for this
 -- character, independent of level, questlog, history, config, or skills.
--- Called once from BuildNameIndex (fires at load and on locale swap).
+-- Called from PLAYER_ENTERING_WORLD (guaranteed after all Lua is loaded)
+-- and from the locale-detection OnUpdate (covers locale swaps).
 -- Checks: wrong race bitmask, wrong class bitmask, missing loc name.
 function pfDatabase:BuildStaticRejectSet()
   local reject = self.staticRejectSet
