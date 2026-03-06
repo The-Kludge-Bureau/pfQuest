@@ -270,18 +270,29 @@ pfDatabase.itemlist.db_tmp = {}
 pfDatabase.itemlist.registry = {}
 pfDatabase.TrackQuestItemDependency = function(self, item, qid)
   self.itemlist.registry[item] = qid
-  self.itemlist.update = GetTime() + .5
-  self.itemlist:Show()
+  -- only set the deadline if a scan isn't already pending
+  if not self.itemlist.pending then
+    self.itemlist.update = GetTime() + .5
+    self.itemlist.pending = true
+    self.itemlist:Show()
+  end
 end
 
 pfDatabase.itemlist:RegisterEvent("BAG_UPDATE")
 pfDatabase.itemlist:SetScript("OnEvent", function()
-  this.update = GetTime() + .5
-  this:Show()
+  -- only set the deadline on the first event in a burst
+  if not this.pending then
+    this.update = GetTime() + .5
+    this.pending = true
+    this:Show()
+  end
 end)
 
 pfDatabase.itemlist:SetScript("OnUpdate", function()
   if GetTime() < this.update then return end
+
+  -- clear pending flag so the next BAG_UPDATE burst can schedule a new scan
+  this.pending = false
 
   -- remove obsolete registry entries
   for item, qid in pairs(this.registry) do
@@ -290,9 +301,13 @@ pfDatabase.itemlist:SetScript("OnUpdate", function()
     end
   end
 
-  -- save and clean previous items
+  -- swap db and db_tmp: db_tmp becomes the new db, old db becomes previous
   local previous = this.db
-  this.db = {}
+  this.db = this.db_tmp
+  this.db_tmp = previous
+
+  -- clear the new db in-place (avoids table allocation)
+  for k in pairs(this.db) do this.db[k] = nil end
 
   -- fill new item db with bag items
   for bag = 4, 0, -1 do
