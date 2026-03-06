@@ -222,6 +222,11 @@ pfMap.unifiedcache = unifiedcache
 pfMap.titleIndex = {}
 pfMap.tooltipIndex = {}
 
+-- Set of node tables that have been modified since the last UpdateNodes call.
+-- Keyed by node table reference so the node table itself stays clean.
+-- AddNode/DeleteNode insert here; UpdateNodes reads and clears entries.
+pfMap.dirtyNodes = {}
+
 pfMap.minimap_indoor = minimap_indoor
 pfMap.minimap_zoom = minimap_zoom
 pfMap.minimap_sizes = minimap_sizes
@@ -554,7 +559,7 @@ function pfMap:AddNode(meta)
   pfMap.nodes[addon][map][coords][title] = similar_nodes[sindex]
 
   -- mark this coord's node table dirty so UpdateNodes knows to reprocess it
-  pfMap.nodes[addon][map][coords].dirty = true
+  pfMap.dirtyNodes[pfMap.nodes[addon][map][coords]] = true
 
   -- maintain reverse title index for O(1) DeleteNode
   if not pfMap.titleIndex[addon] then pfMap.titleIndex[addon] = {} end
@@ -621,6 +626,7 @@ function pfMap:DeleteNode(addon, title)
     pfMap.nodes = {}
     pfMap.titleIndex = {}
     pfMap.tooltipIndex = {}
+    pfMap.dirtyNodes = {}
 
   elseif not title then
     -- wipe all nodes for this addon; clean up both reverse indexes
@@ -655,7 +661,7 @@ function pfMap:DeleteNode(addon, title)
               pfMap.nodes[addon][map][coords] = nil
             else
               -- coord survives with remaining titles; reprocess on next UpdateNodes
-              pfMap.nodes[addon][map][coords].dirty = true
+              pfMap.dirtyNodes[pfMap.nodes[addon][map][coords]] = true
             end
           end
         end
@@ -956,11 +962,11 @@ function pfMap:UpdateNodes()
 
         -- skip UpdateNode if this pin is already bound to this exact node table
         -- and nothing has been added/removed from it since the last UpdateNodes call.
-        -- node.dirty is set by AddNode/DeleteNode on any write; frame.node ~= node
-        -- catches coord-slot shifts caused by coord insertions/removals.
-        if pfMap.pins[i].node ~= node or node.dirty then
+        -- pfMap.dirtyNodes[node] is set by AddNode/DeleteNode on any real write.
+        -- frame.node ~= node catches coord-slot shifts from insertions/removals.
+        if pfMap.pins[i].node ~= node or pfMap.dirtyNodes[node] then
           pfMap:UpdateNode(pfMap.pins[i], node, color)
-          node.dirty = nil
+          pfMap.dirtyNodes[node] = nil
         else
           n_skipped = n_skipped + 1
         end
