@@ -137,6 +137,7 @@ tracker:SetScript("OnHide", function()
 end)
 
 tracker.buttons = {}
+tracker.buttonByTitle = {}  -- reverse map: title → button index, for O(1) duplicate detection
 tracker.mode = "QUEST_TRACKING"
 
 tracker.backdrop = CreateFrame("Frame", nil, tracker)
@@ -316,6 +317,11 @@ local function trackersort(a,b)
   end
 end
 
+-- Reusable cache for GetQuestLogLeaderBoard results within a single ButtonEvent
+-- call. Avoids calling the API twice per objective (once for progress, once for
+-- display). Cleared at the start of each ButtonEvent invocation.
+local board_cache = {}
+
 function tracker.ButtonEvent(self)
   local self   = self or this
   local title  = self.title
@@ -371,8 +377,10 @@ function tracker.ButtonEvent(self)
     local expanded = expand_states[title] == 1 and true or nil
 
     if objectives and objectives > 0 then
+      -- populate cache and compute progress in one pass
       for i=1, objectives, 1 do
-        local text, _, done = GetQuestLogLeaderBoard(i, qlogid)
+        local text, type, done = GetQuestLogLeaderBoard(i, qlogid)
+        board_cache[i] = { text, type, done }
         local _, _, obj, objNum, objNeeded = strfind(gsub(text, "\239\188\154", ":"), "(.*):%s*([%d]+)%s*/%s*([%d]+)")
         if objNum and objNeeded then
           max = max + objNeeded
@@ -381,6 +389,8 @@ function tracker.ButtonEvent(self)
           max = max + 1
         end
       end
+      -- clear stale entries beyond current objective count
+      for i = objectives + 1, table.getn(board_cache) do board_cache[i] = nil end
     end
 
     if cur == max or complete then
@@ -395,7 +405,9 @@ function tracker.ButtonEvent(self)
       self:SetHeight(entryheight + objectives * fontsize)
 
       for i=1, objectives, 1 do
-        local text, _, done = GetQuestLogLeaderBoard(i, qlogid)
+        -- read from cache instead of calling GetQuestLogLeaderBoard again
+        local entry = board_cache[i]
+        local text, _, done = entry[1], entry[2], entry[3]
         local _, _, obj, objNum, objNeeded = strfind(gsub(text, "\239\188\154", ":"), "(.*):%s*([%d]+)%s*/%s*([%d]+)")
 
         if not self.objectives[i] then
@@ -504,11 +516,14 @@ end
 function tracker.ButtonAdd(title, node)
   if not title or not node then return end
 
-  local questid = title
-  for qid, data in pairs(pfQuest.questlog) do
-    if data.title == title then
-      questid = qid
-      break
+  -- O(1) questid lookup: node.questid is set for all PFQUEST nodes from the DB.
+  -- For the rare case it's missing or not in questlog (title-keyed quests), fall
+  -- back to the linear scan so correctness is preserved.
+  local questid = node.questid or title
+  if node.questid and not pfQuest.questlog[node.questid] then
+    questid = title
+    for qid, data in pairs(pfQuest.questlog) do
+      if data.title == title then questid = qid break end
     end
   end
 
@@ -527,23 +542,16 @@ function tracker.ButtonAdd(title, node)
 
   local id
 
-  -- skip duplicate titles
-  for bid, button in pairs(tracker.buttons) do
-    if button.title and button.title == title then
-      if node.dummy or not node.texture then
-        -- We found a node icon (1st prio)
-        -- use the ID and update the button
-        id = bid
-        break
-      elseif node.cluster and ( not button.node or button.node.texture ) then
-        -- We found a cluster icon (2nd prio)
-        -- set the id, but still try to find a node icon
-        id = bid
-      else
-        -- got none of the above, therefore
-        -- no icon update required, skip here
-        return
-      end
+  -- O(1) duplicate check via reverse map (replaces linear scan of tracker.buttons)
+  local existing = tracker.buttonByTitle[title]
+  if existing then
+    local button = tracker.buttons[existing]
+    if node.dummy or not node.texture then
+      id = existing   -- node icon takes slot
+    elseif node.cluster and (not button.node or button.node.texture) then
+      id = existing   -- cluster icon, acceptable
+    else
+      return          -- no icon update needed
     end
   end
 
@@ -599,6 +607,9 @@ function tracker.ButtonAdd(title, node)
   tracker.buttons[id].node = node
   tracker.buttons[id].questid = questid
 
+  -- keep reverse map in sync
+  tracker.buttonByTitle[title] = id
+
   -- reload button data
   tracker.ButtonEvent(tracker.buttons[id])
 end
@@ -613,6 +624,8 @@ function tracker.Reset()
     button:SetHeight(0)
     button:Hide()
   end
+  -- reverse map is only valid while buttons hold titles; clear on full reset
+  for k in pairs(tracker.buttonByTitle) do tracker.buttonByTitle[k] = nil end
 
   -- add tracked quests
   local _, numQuests = GetNumQuestLogEntries()
