@@ -116,23 +116,23 @@ end
 
 local function minimap_indoor()
   local tempzoom = 0
-	local state = 1
-	if GetCVar("minimapZoom") == GetCVar("minimapInsideZoom") then
-		if GetCVar("minimapInsideZoom")+0 >= 3 then
-			pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() - 1)
-			tempzoom = 1
-		else
-			pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + 1)
-			tempzoom = -1
-		end
-	end
+  local state = 1
+  if GetCVar("minimapZoom") == GetCVar("minimapInsideZoom") then
+    if GetCVar("minimapInsideZoom")+0 >= 3 then
+      pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() - 1)
+      tempzoom = 1
+    else
+      pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + 1)
+      tempzoom = -1
+    end
+  end
 
-	if GetCVar("minimapInsideZoom")+0 == pfMap.drawlayer:GetZoom() then
+  if GetCVar("minimapInsideZoom")+0 == pfMap.drawlayer:GetZoom() then
     state = 0
   end
 
   pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + tempzoom)
-	return state
+  return state
 end
 
 local function str2rgb(text)
@@ -882,12 +882,16 @@ function pfMap:UpdateNodes()
   local i = 1
 
   -- reset tracker
+  local t_reset = GetTime()
   pfQuest.tracker.Reset()
+  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes tracker.Reset=%.4fs", GetTime() - t_reset))
 
   -- reset route
   pfQuest.route:Reset()
 
   -- refresh all nodes
+  local t_nodes = GetTime()
+  local n_pins = 0
   for addon, _ in pairs(pfMap.nodes) do
     if pfMap.nodes[addon][map] then
       for coords, node in pairs(pfMap.nodes[addon][map]) do
@@ -938,10 +942,12 @@ function pfMap:UpdateNodes()
           pfMap.pins[i]:Show()
         end
 
+        n_pins = n_pins + 1
         i = i + 1
       end
     end
   end
+  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes pins=%d loop=%.4fs", n_pins, GetTime() - t_nodes))
 
   -- hide remaining pins
   for j=i, table.getn(pfMap.pins) do
@@ -949,9 +955,11 @@ function pfMap:UpdateNodes()
   end
 
   -- Perform tracker layout once after all ButtonAdd calls complete
+  local t_layout = GetTime()
   if pfQuest.tracker and pfQuest.tracker.DoLayout then
     pfQuest.tracker.DoLayout()
   end
+  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes DoLayout=%.4fs", GetTime() - t_layout))
 end
 
 function pfMap:UpdateMinimap()

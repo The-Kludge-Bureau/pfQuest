@@ -433,6 +433,7 @@ pfDatabase.Reload()
 -- for exact matches (the hot path in SearchQuestID). Partial-match calls (browser,
 -- slash commands) still use the full scan since they can't use this index.
 pfDatabase.nameIndex = {}
+pfDatabase.lastQuestGiversSet = {}
 
 function pfDatabase:BuildNameIndex()
   local idx = self.nameIndex
@@ -451,6 +452,9 @@ function pfDatabase:BuildNameIndex()
       end
     end
   end
+
+  -- locale tables may have changed; force SearchQuests to re-add all nodes
+  for id in pairs(self.lastQuestGiversSet) do self.lastQuestGiversSet[id] = nil end
 end
 
 pfDatabase:BuildNameIndex()
@@ -1623,41 +1627,19 @@ function pfDatabase:GetPlayerSkillCached(skill)
   return rank or false
 end
 
--- SearchQuests fingerprint: skip the full scan if nothing affecting questgiver
--- visibility has actually changed since the last run.
-pfDatabase.questgiverFingerprint = ""
-local function buildQuestgiverFingerprint(plevel, pfaction, prace, pclass)
-  -- skill state is already in skillstate (quest.lua) but we need it here too;
-  -- we snapshot it from the skill cache we just built.
-  local skillParts = {}
-  for name, rank in pairs(pfDatabase.skillcache) do
-    insert(skillParts, name .. rank)
-  end
-  table.sort(skillParts)
-
-  -- history and questlog keys give us a cheap change signal
-  local logParts = {}
-  for qid in pairs(pfQuest.questlog) do insert(logParts, qid) end
-  table.sort(logParts)
-  local histParts = {}
-  for qid in pairs(pfQuest_history) do insert(histParts, qid) end
-  table.sort(histParts)
-
-  return plevel .. pfaction .. prace .. pclass
-    .. table.concat(skillParts, ",")
-    .. "|" .. table.concat(logParts, ",")
-    .. "|" .. table.concat(histParts, ",")
-    .. "|" .. (pfQuest_config["showlowlevel"] or "")
-    .. "|" .. (pfQuest_config["showhighlevel"] or "")
-    .. "|" .. (pfQuest_config["showfestival"] or "")
-end
+-- SearchQuests incremental node cache.
+-- Tracks which quest IDs passed QuestFilter on the last run. On subsequent
+-- calls only the delta (quests entering or leaving the passing set) is
+-- processed, so SearchMobID/SearchObjectID are skipped for quests whose
+-- questgiver nodes already exist. Must be cleared whenever pfMap.nodes
+-- ["PFQUEST"] is wiped (e.g. ResetAll).
+-- (Initialised at line ~435 alongside nameIndex so BuildNameIndex can clear it.)
 
 -- SearchQuests
--- Scans for all available quests
--- Adds map nodes for each quest starter and ender
--- Returns its map table
+-- Scans for available quests and adds/removes questgiver map nodes.
+-- On the first call processes all quests; on subsequent calls only the
+-- delta between the previous passing set and the current one is touched.
 function pfDatabase:SearchQuests(meta, maps)
-  local level, minlvl, maxlvl, race, class, prof, festival
   local maps = maps or {}
   local meta = meta or {}
 
@@ -1676,19 +1658,37 @@ function pfDatabase:SearchQuests(meta, maps)
   local _, class = UnitClass("player")
   local pclass = pfDatabase:GetBitByClass(class)
 
-  -- build skill cache once for this entire scan (used by QuestFilter below)
+  -- build skill cache once for this scan (used by QuestFilter / GetPlayerSkillCached)
   pfDatabase:BuildSkillCache()
 
-  -- build fingerprint and skip the full scan if nothing has changed
-  local fingerprint = buildQuestgiverFingerprint(plevel, pfaction, prace, pclass)
-  if fingerprint == pfDatabase.questgiverFingerprint then
-    pfQuest:Debug("|cffaaaaaaSearchQuests skipped (no changes)")
-    return maps
-  end
-  pfDatabase.questgiverFingerprint = fingerprint
+  local t_filter, t_nodes, t_start = 0, 0, GetTime()
 
+  -- Phase 1: build the full set of quests that currently pass the filter.
+  -- This loop is unavoidable but is the only O(all_quests) work we do.
+  local currentSet = {}
   for id in pairs(quests) do
-    if pfDatabase:QuestFilter(id, plevel, pclass, prace) then
+    local tf0 = GetTime()
+    local pass = pfDatabase:QuestFilter(id, plevel, pclass, prace)
+    t_filter = t_filter + (GetTime() - tf0)
+    if pass then currentSet[id] = true end
+  end
+
+  -- Phase 2: remove nodes for quests that left the passing set.
+  local t_rm0 = GetTime()
+  local removed = 0
+  for id in pairs(self.lastQuestGiversSet) do
+    if not currentSet[id] then
+      local title = ( pfDB.quests.loc[id] and pfDB.quests.loc[id].T ) or UNKNOWN
+      pfMap:DeleteNode("PFQUEST", title)
+      removed = removed + 1
+    end
+  end
+  local t_rm = GetTime() - t_rm0
+
+  -- Phase 3: add nodes only for quests newly entering the passing set.
+  -- Quests already in lastQuestGiversSet are skipped — their nodes exist.
+  for id in pairs(currentSet) do
+    if not self.lastQuestGiversSet[id] then
       -- set metadata
       meta["quest"] = ( pfDB.quests.loc[id] and pfDB.quests.loc[id].T ) or UNKNOWN
       meta["questid"] = id
@@ -1721,14 +1721,16 @@ function pfDatabase:SearchQuests(meta, maps)
         meta["layer"] = 2
       end
 
-      -- iterate over all questgivers
+      -- add questgiver nodes
       if quests[id]["start"] then
         -- units
         if quests[id]["start"]["U"] then
           meta["QTYPE"] = "NPC_START"
           for _, unit in pairs(quests[id]["start"]["U"]) do
             if units[unit] and strfind(units[unit]["fac"] or pfaction, pfaction) then
+              local tn0 = GetTime()
               maps = pfDatabase:SearchMobID(unit, meta, maps)
+              t_nodes = t_nodes + (GetTime() - tn0)
             end
           end
         end
@@ -1738,13 +1740,23 @@ function pfDatabase:SearchQuests(meta, maps)
           meta["QTYPE"] = "OBJECT_START"
           for _, object in pairs(quests[id]["start"]["O"]) do
             if objects[object] and strfind(objects[object]["fac"] or pfaction, pfaction) then
+              local tn0 = GetTime()
               maps = pfDatabase:SearchObjectID(object, meta, maps)
+              t_nodes = t_nodes + (GetTime() - tn0)
             end
           end
         end
       end
     end
   end
+
+  -- Update lastQuestGiversSet to reflect the current passing set.
+  -- Reuse the table in-place to avoid allocation.
+  for id in pairs(self.lastQuestGiversSet) do self.lastQuestGiversSet[id] = nil end
+  for id in pairs(currentSet) do self.lastQuestGiversSet[id] = true end
+
+  pfQuest:Debug(format("|cffff3333TIMER SearchQuests total=%.4fs  filter=%.4fs  remove=%d(%.4fs)  nodes=%.4fs",
+    GetTime() - t_start, t_filter, removed, t_rm, t_nodes))
 end
 
 -- AddCustomIcon
