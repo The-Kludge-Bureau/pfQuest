@@ -553,6 +553,9 @@ function pfMap:AddNode(meta)
   -- set current node to combined node
   pfMap.nodes[addon][map][coords][title] = similar_nodes[sindex]
 
+  -- mark this coord's node table dirty so UpdateNodes knows to reprocess it
+  pfMap.nodes[addon][map][coords].dirty = true
+
   -- maintain reverse title index for O(1) DeleteNode
   if not pfMap.titleIndex[addon] then pfMap.titleIndex[addon] = {} end
   if not pfMap.titleIndex[addon][title] then pfMap.titleIndex[addon][title] = {} end
@@ -650,6 +653,9 @@ function pfMap:DeleteNode(addon, title)
             pfMap.nodes[addon][map][coords][title] = nil
             if IsEmpty(pfMap.nodes[addon][map][coords]) then
               pfMap.nodes[addon][map][coords] = nil
+            else
+              -- coord survives with remaining titles; reprocess on next UpdateNodes
+              pfMap.nodes[addon][map][coords].dirty = true
             end
           end
         end
@@ -940,7 +946,7 @@ function pfMap:UpdateNodes()
 
   -- refresh all nodes
   local t_nodes = GetTime()
-  local n_pins = 0
+  local n_pins, n_skipped = 0, 0
   for addon, _ in pairs(pfMap.nodes) do
     if pfMap.nodes[addon][map] then
       for coords, node in pairs(pfMap.nodes[addon][map]) do
@@ -948,7 +954,16 @@ function pfMap:UpdateNodes()
           pfMap.pins[i] = pfMap:BuildNode("pfMapPin" .. i, WorldMapButton)
         end
 
-        pfMap:UpdateNode(pfMap.pins[i], node, color)
+        -- skip UpdateNode if this pin is already bound to this exact node table
+        -- and nothing has been added/removed from it since the last UpdateNodes call.
+        -- node.dirty is set by AddNode/DeleteNode on any write; frame.node ~= node
+        -- catches coord-slot shifts caused by coord insertions/removals.
+        if pfMap.pins[i].node ~= node or node.dirty then
+          pfMap:UpdateNode(pfMap.pins[i], node, color)
+          node.dirty = nil
+        else
+          n_skipped = n_skipped + 1
+        end
 
         -- set position (use cached coord parse to avoid strfind alloc)
         local x, y
@@ -996,7 +1011,7 @@ function pfMap:UpdateNodes()
       end
     end
   end
-  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes pins=%d loop=%.4fs", n_pins, GetTime() - t_nodes))
+  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes pins=%d skipped=%d loop=%.4fs", n_pins, n_skipped, GetTime() - t_nodes))
 
   -- hide remaining pins
   for j=i, table.getn(pfMap.pins) do
