@@ -858,23 +858,26 @@ function pfDatabase:SearchMobID(id, meta, maps, prio)
 
   local maps = maps or {}
   local prio = prio or 1
+  meta = meta or {}
+
+  -- hoist invariant fields outside the coord loop; these are the same for
+  -- every spawn point of this mob so there is no need to set them per-coord
+  meta["spawn"]     = pfDB.units.loc[id]
+  meta["spawnid"]   = id
+  meta["title"]     = meta["quest"] or meta["item"] or meta["spawn"]
+  meta["level"]     = units[id]["lvl"] or UNKNOWN
+  meta["spawntype"] = pfQuest_Loc["Unit"]
+  -- description only depends on the above invariant fields + QTYPE/quest/item
+  -- compute once here; AddNode will skip its own BuildQuestDescription call
+  meta["description"] = pfDatabase:BuildQuestDescription(meta)
 
   for _, data in pairs(units[id]["coords"]) do
     local x, y, zone, respawn = unpack(data)
 
     if zone > 0 then
-      -- add all gathered data
-      meta = meta or {}
-      meta["spawn"] = pfDB.units.loc[id]
-      meta["spawnid"] = id
-
-      meta["title"] = meta["quest"] or meta["item"] or meta["spawn"]
-      meta["zone"]  = zone
-      meta["x"]     = x
-      meta["y"]     = y
-
-      meta["level"] = units[id]["lvl"] or UNKNOWN
-      meta["spawntype"] = pfQuest_Loc["Unit"]
+      meta["zone"]    = zone
+      meta["x"]       = x
+      meta["y"]       = y
       meta["respawn"] = respawn > 0 and SecondsToTime(respawn)
 
       maps[zone] = maps[zone] and maps[zone] + prio or prio
@@ -1099,23 +1102,24 @@ function pfDatabase:SearchObjectID(id, meta, maps, prio)
   local skill, caption = pfDatabase:SearchObjectSkill(id)
   local maps = maps or {}
   local prio = prio or 1
+  meta = meta or {}
+
+  -- hoist invariant fields outside the coord loop
+  meta["spawn"]     = pfDB.objects.loc[id]
+  meta["spawnid"]   = id
+  meta["title"]     = meta["quest"] or meta["item"] or meta["spawn"]
+  meta["level"]     = skill and string.format("%s [%s]", skill, caption) or nil
+  meta["spawntype"] = pfQuest_Loc["Object"]
+  -- description only depends on invariant fields; compute once
+  meta["description"] = pfDatabase:BuildQuestDescription(meta)
 
   for _, data in pairs(objects[id]["coords"]) do
     local x, y, zone, respawn = unpack(data)
 
     if zone > 0 then
-      -- add all gathered data
-      meta = meta or {}
-      meta["spawn"] = pfDB.objects.loc[id]
-      meta["spawnid"] = id
-
-      meta["title"] = meta["quest"] or meta["item"] or meta["spawn"]
-      meta["zone"]  = zone
-      meta["x"]     = x
-      meta["y"]     = y
-
-      meta["level"] = skill and string.format("%s [%s]", skill, caption) or nil
-      meta["spawntype"] = pfQuest_Loc["Object"]
+      meta["zone"]    = zone
+      meta["x"]       = x
+      meta["y"]       = y
       meta["respawn"] = respawn and SecondsToTime(respawn)
 
       maps[zone] = maps[zone] and maps[zone] + prio or prio
@@ -1310,24 +1314,23 @@ function pfDatabase:SearchQuestID(id, meta, maps)
 
     -- search quest-ender
     if quests[id]["end"] then
+      -- compute complete state once, outside both ender loops
+      local ender_texture
+      if meta["qlogid"] then
+        local _, _, _, _, _, complete = compat.GetQuestLogTitle(meta["qlogid"])
+        complete = complete or GetNumQuestLeaderBoards(meta["qlogid"]) == 0 and true or nil
+        ender_texture = (complete == true or complete == 1)
+          and pfQuestConfig.path.."\\img\\complete_c"
+          or  pfQuestConfig.path.."\\img\\complete"
+      else
+        ender_texture = pfQuestConfig.path.."\\img\\complete_c"
+      end
+
       -- units
       if quests[id]["end"]["U"] then
         for _, unit in pairs(quests[id]["end"]["U"]) do
-          meta = meta or {}
-
-          if meta["qlogid"] then
-            local _, _, _, _, _, complete = compat.GetQuestLogTitle(meta["qlogid"])
-            complete = complete or GetNumQuestLeaderBoards(meta["qlogid"]) == 0 and true or nil
-            if complete == true or complete == 1 then
-              meta["texture"] = pfQuestConfig.path.."\\img\\complete_c"
-            else
-              meta["texture"] = pfQuestConfig.path.."\\img\\complete"
-            end
-          else
-            meta["texture"] = pfQuestConfig.path.."\\img\\complete_c"
-          end
+          meta["texture"] = ender_texture
           meta["QTYPE"] = "NPC_END"
-
           maps = pfDatabase:SearchMobID(unit, meta, maps, 0)
         end
       end
@@ -1335,22 +1338,8 @@ function pfDatabase:SearchQuestID(id, meta, maps)
       -- objects
       if quests[id]["end"]["O"] then
         for _, object in pairs(quests[id]["end"]["O"]) do
-          meta = meta or {}
-
-          if meta["qlogid"] then
-            local _, _, _, _, _, complete = compat.GetQuestLogTitle(meta["qlogid"])
-            complete = complete or GetNumQuestLeaderBoards(meta["qlogid"]) == 0 and true or nil
-            if complete then
-              meta["texture"] = pfQuestConfig.path.."\\img\\complete_c"
-            else
-              meta["texture"] = pfQuestConfig.path.."\\img\\complete"
-            end
-          else
-            meta["texture"] = pfQuestConfig.path.."\\img\\complete_c"
-          end
-
+          meta["texture"] = ender_texture
           meta["QTYPE"] = "OBJECT_END"
-
           maps = pfDatabase:SearchObjectID(object, meta, maps, 0)
         end
       end

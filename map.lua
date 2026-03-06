@@ -497,7 +497,11 @@ function pfMap:AddNode(meta)
   if not meta["zone"] then return end
   if not meta["title"] then return end
 
-  meta["description"] = pfDatabase:BuildQuestDescription(meta)
+  -- only compute description if the caller hasn't already done it
+  -- (SearchMobID / SearchObjectID hoist this call outside their coord loops)
+  if meta["description"] == nil then
+    meta["description"] = pfDatabase:BuildQuestDescription(meta)
+  end
 
   local addon = meta["addon"] or "PFDB"
   local map = meta["zone"]
