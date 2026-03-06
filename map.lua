@@ -216,6 +216,12 @@ pfMap.mpins = {}
 pfMap.drawlayer = Minimap
 pfMap.unifiedcache = unifiedcache
 
+-- Reverse indexes for O(1) DeleteNode lookups.
+-- titleIndex[addon][title][map][coords] = true  — set by AddNode
+-- tooltipIndex[title][spawn] = true             — set by AddNode
+pfMap.titleIndex = {}
+pfMap.tooltipIndex = {}
+
 pfMap.minimap_indoor = minimap_indoor
 pfMap.minimap_zoom = minimap_zoom
 pfMap.minimap_sizes = minimap_sizes
@@ -543,6 +549,12 @@ function pfMap:AddNode(meta)
   -- set current node to combined node
   pfMap.nodes[addon][map][coords][title] = similar_nodes[sindex]
 
+  -- maintain reverse title index for O(1) DeleteNode
+  if not pfMap.titleIndex[addon] then pfMap.titleIndex[addon] = {} end
+  if not pfMap.titleIndex[addon][title] then pfMap.titleIndex[addon][title] = {} end
+  if not pfMap.titleIndex[addon][title][map] then pfMap.titleIndex[addon][title][map] = {} end
+  pfMap.titleIndex[addon][title][map][coords] = true
+
   -- add node to unified cluster cache
   if not meta["cluster"] and not meta["texture"] then
     local node_index = meta.item or meta.spawn or UNKNOWN
@@ -570,6 +582,10 @@ function pfMap:AddNode(meta)
     pfMap.tooltips[spawn] = pfMap.tooltips[spawn] or {}
     pfMap.tooltips[spawn][title] = pfMap.tooltips[spawn][title] or {}
     pfMap.tooltips[spawn][title][map] = pfMap.tooltips[spawn][title][map] or similar_nodes[sindex]
+
+    -- maintain reverse tooltip index for O(1) DeleteNode
+    if not pfMap.tooltipIndex[title] then pfMap.tooltipIndex[title] = {} end
+    pfMap.tooltipIndex[title][spawn] = true
   end
 
   pfMap.queue_update = GetTime()
@@ -592,34 +608,63 @@ function pfMap:GetNodes(addon, title)
 end
 
 function pfMap:DeleteNode(addon, title)
-  -- remove tooltips
   if not addon then
+    -- wipe everything
     pfMap.tooltips = {}
-  else
-    for mk, mv in pairs(pfMap.tooltips) do
-      for tk, tv in pairs(mv) do
-        if ( title and tk == title ) or ( not title and tv.addon == addon ) then
-          pfMap.tooltips[mk][tk] = nil
+    pfMap.nodes = {}
+    pfMap.titleIndex = {}
+    pfMap.tooltipIndex = {}
+
+  elseif not title then
+    -- wipe all nodes for this addon; clean up both reverse indexes
+    if pfMap.titleIndex[addon] then
+      for t, maps in pairs(pfMap.titleIndex[addon]) do
+        -- clean tooltipIndex entries that belonged to this addon's titles
+        local spawns = pfMap.tooltipIndex[t]
+        if spawns then
+          for spawn in pairs(spawns) do
+            if pfMap.tooltips[spawn] then
+              pfMap.tooltips[spawn][t] = nil
+              if IsEmpty(pfMap.tooltips[spawn]) then
+                pfMap.tooltips[spawn] = nil
+              end
+            end
+          end
+          pfMap.tooltipIndex[t] = nil
         end
       end
+      pfMap.titleIndex[addon] = nil
     end
-  end
+    pfMap.nodes[addon] = nil
 
-  -- remove nodes
-  if not addon then
-    pfMap.nodes = {}
-  elseif not title then
-    pfMap.nodes[addon] = {}
-  elseif pfMap.nodes[addon] then
-    for map, foo in pairs(pfMap.nodes[addon]) do
-      for coords, node in pairs(pfMap.nodes[addon][map]) do
-        if pfMap.nodes[addon][map][coords][title] then
-          pfMap.nodes[addon][map][coords][title] = nil
-          if IsEmpty(pfMap.nodes[addon][map][coords]) then
-            pfMap.nodes[addon][map][coords] = nil
+  elseif pfMap.titleIndex[addon] and pfMap.titleIndex[addon][title] then
+    -- fast path: use reverse index to find exactly which (map, coords) to clear
+    for map, coords_set in pairs(pfMap.titleIndex[addon][title]) do
+      if pfMap.nodes[addon] and pfMap.nodes[addon][map] then
+        for coords in pairs(coords_set) do
+          if pfMap.nodes[addon][map][coords] then
+            pfMap.nodes[addon][map][coords][title] = nil
+            if IsEmpty(pfMap.nodes[addon][map][coords]) then
+              pfMap.nodes[addon][map][coords] = nil
+            end
           end
         end
       end
+    end
+    pfMap.titleIndex[addon][title] = nil
+
+    -- clean up tooltip entries for this title using the reverse tooltip index
+    local spawns = pfMap.tooltipIndex[title]
+    if spawns then
+      for spawn in pairs(spawns) do
+        if pfMap.tooltips[spawn] then
+          pfMap.tooltips[spawn][title] = nil
+          if IsEmpty(pfMap.tooltips[spawn]) then
+            pfMap.tooltips[spawn] = nil
+          end
+        end
+      end
+      pfMap.tooltipIndex[title] = nil
     end
   end
 
