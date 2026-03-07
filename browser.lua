@@ -823,6 +823,11 @@ pfBrowser:SetScript("OnUpdate", function()
     searchElapsed = 0
   end
 
+  -- skip multi-select machinery entirely when Ctrl is not held and no
+  -- selection is in progress — avoids an unconditional GetMouseFocus()
+  -- call every 0.1s when the feature is idle
+  if not IsControlKeyDown() and not this.selectState then return end
+
   -- Cache GetMouseFocus to avoid multiple calls
   local focus = GetMouseFocus()
 
