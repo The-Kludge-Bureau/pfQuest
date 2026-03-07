@@ -289,9 +289,14 @@ pfQuest.route:SetScript("OnUpdate", function()
   end
 
   if wrongmap then
-    -- hide player-to-object path
+    -- hide all paths and reset firstnode so objectivepath is redrawn
+    -- when the user returns to zone view. Without this, objectivepath
+    -- stays visible at continent/world zoom (drawn at zone coordinates)
+    -- and doesn't redraw on return because firstnode appears unchanged.
+    ClearPath(objectivepath)
     ClearPath(playerpath)
     ClearPath(mplayerpath)
+    this.firstnode = nil
   else
     -- draw player-to-object path
     ClearPath(playerpath)
