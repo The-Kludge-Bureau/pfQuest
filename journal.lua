@@ -17,17 +17,13 @@ local function tablesize(tbl)
   return count
 end
 
-local function OnUpdate()
-  if not this.column and MouseIsOver(this) then
+local function OnEnter()
+  -- show remove button and highlight for quest entries (not column headers)
+  if not this.column then
     this.remove:Show()
     this.bg:Show()
-  else
-    this.remove:Hide()
-    this.bg:Hide()
   end
-end
 
-local function OnEnter()
   if this.id then
     -- show extended quest tooltip
     pfDatabase:ShowExtendedTooltip(this.id, GameTooltip, this, "ANCHOR_LEFT", 0, -10)
@@ -43,6 +39,8 @@ local function OnEnter()
 end
 
 local function OnLeave()
+  this.remove:Hide()
+  this.bg:Hide()
   GameTooltip:Hide()
 end
 
@@ -80,7 +78,6 @@ local function CreateEntry(self, index)
   self[index]:SetScript("OnEnter", OnEnter)
   self[index]:SetScript("OnLeave", OnLeave)
   self[index]:SetScript("OnClick", OnClick)
-  self[index]:SetScript("OnUpdate", OnUpdate)
 
   self[index].text = self[index]:CreateFontString("Caption", "LOW", "GameFontWhite")
   self[index].text:SetFont(pfUI.font_default, pfUI_config.global.font_size, "OUTLINE")
@@ -91,11 +88,13 @@ local function CreateEntry(self, index)
   self[index].bg = self[index]:CreateTexture(nil, "BACKGROUND")
   self[index].bg:SetAllPoints(self[index].text)
   self[index].bg:SetTexture(1,1,1,.02)
+  self[index].bg:Hide()
 
   self[index].remove = CreateFrame("Button", nil, self[index])
   self[index].remove:SetPoint("RIGHT", -5, 0)
   self[index].remove:SetHeight(20)
   self[index].remove:SetWidth(20)
+  self[index].remove:Hide()
   self[index].remove:SetScript("OnClick", RemoveOnClick)
   self[index].remove.entry = self[index]
   self[index].remove.view = self
@@ -109,6 +108,8 @@ end
 
 local function UpdateEntry(self, index)
   if self[index].column then
+    self[index].remove:Hide()
+    self[index].bg:Hide()
     self[index].text:SetText((collapsed[self[index].column] and "|cff338855" or "|cff33ffcc")..self[index].column)
     self[index]:Show()
   elseif self[index].id then
