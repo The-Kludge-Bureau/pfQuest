@@ -1030,6 +1030,9 @@ function pfMap:UpdateNodes()
     pfQuest.tracker.DoLayout()
   end
   pfQuest:Debug(format("|cffffff00TIMER UpdateNodes DoLayout=%.4fs", GetTime() - t_layout))
+
+  -- record which zone was rendered so WORLD_MAP_UPDATE can skip no-op opens
+  pfMap.lastUpdateZone = map
 end
 
 function pfMap:UpdateMinimap()
@@ -1162,13 +1165,17 @@ pfMap:SetScript("OnEvent", function()
     end
   end
 
-  -- update nodes on world map changes: stamp the debounce instead of calling
-  -- UpdateNodes directly. WORLD_MAP_UPDATE fires ~100 times on map open as
-  -- GetCurrentMapZone() cycles through states; a direct call turned that into
-  -- ~100 × UpdateNodes. The debounce (+ questBusy guard) collapses them all
-  -- into one call once the map finishes rendering.
+  -- update nodes on world map changes: only schedule an UpdateNodes call if
+  -- the zone has changed or nodes have been dirtied since the last call.
+  -- WORLD_MAP_UPDATE fires on every map open (M key); without this guard the
+  -- debounce would trigger a full UpdateNodes on every open even when nothing
+  -- has changed -- pins are children of WorldMapButton and hide/show with it
+  -- automatically, so no work is needed for a same-zone same-state reopen.
   if event == "WORLD_MAP_UPDATE" then
-    pfMap.queue_update = GetTime()
+    local newzone = pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
+    if newzone ~= pfMap.lastUpdateZone or next(pfMap.dirtyNodes) then
+      pfMap.queue_update = GetTime()
+    end
   end
 end)
 
