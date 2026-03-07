@@ -1042,6 +1042,8 @@ function pfMap:UpdateNodes()
   -- record which zone was rendered so WORLD_MAP_UPDATE can skip no-op opens
   pfMap.lastUpdateZone = map
   pfMap.dirtyMaps[map] = nil
+  -- map has fully rendered; subsequent zone changes are deliberate user actions
+  pfMap.mapJustOpened = nil
 end
 
 function pfMap:UpdateMinimap()
@@ -1174,18 +1176,34 @@ pfMap:SetScript("OnEvent", function()
     end
   end
 
-  -- update nodes on world map changes: only schedule an UpdateNodes call if
-  -- the zone has changed or the current zone has pending dirty nodes.
-  -- Guards against two sources of false positives:
-  -- (1) GetMapID returns nil during map init (GetCurrentMapZone=0); guarded by
-  --     the `newzone and` check so a transient nil never stamps queue_update.
-  -- (2) next(pfMap.dirtyNodes) is almost always non-nil because dirty nodes in
-  --     other zones are never cleared by UpdateNodes (it only iterates the
-  --     current map). dirtyMaps[newzone] is zone-scoped so it's only true when
-  --     the zone being rendered actually has pending writes.
+  -- update nodes on world map changes.
+  -- Three distinct cases:
+  -- (1) Map just opened (burst of ~100 events while frame renders): use the
+  --     debounce to coalesce them into one call once rendering settles.
+  -- (2) Zone changed by user (deliberate click): call UpdateNodes immediately.
+  -- (3) Continent view (newzone == nil): hide all pins immediately.
+  -- (4) Same zone, dirty nodes: stamp debounce.
   if event == "WORLD_MAP_UPDATE" then
     local newzone = pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
-    if newzone and (newzone ~= pfMap.lastUpdateZone or pfMap.dirtyMaps[newzone]) then
+
+    if newzone == nil then
+      -- continent view: hide all worldmap pins immediately
+      for j = 1, table.getn(pfMap.pins) do
+        if pfMap.pins[j] then pfMap.pins[j]:Hide() end
+      end
+      pfMap.lastUpdateZone = nil
+
+    elseif pfMap.mapJustOpened then
+      -- map just opened: debounce the burst, clear flag once settled
+      pfMap.queue_update = GetTime()
+
+    elseif newzone ~= pfMap.lastUpdateZone then
+      -- deliberate zone change: update immediately, no debounce
+      pfMap.queue_update = nil
+      pfMap:UpdateNodes()
+
+    elseif pfMap.dirtyMaps[newzone] then
+      -- same zone, pending writes: coalesce via debounce
       pfMap.queue_update = GetTime()
     end
   end
@@ -1242,7 +1260,14 @@ pfMap:SetScript("OnUpdate", function()
   end
 
   -- reset map to current zone once map is closed
+  -- also flag the frame as just-opened so the WORLD_MAP_UPDATE handler
+  -- knows to use the debounce instead of calling UpdateNodes immediately
+  -- (the burst of ~100 events during map-open rendering would otherwise
+  -- trigger multiple immediate UpdateNodes calls)
   if WorldMapFrame:IsShown() then
+    if not resetmap then
+      pfMap.mapJustOpened = true
+    end
     resetmap = true
   elseif resetmap == true then
     SetMapToCurrentZone()
