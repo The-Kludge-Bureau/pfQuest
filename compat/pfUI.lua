@@ -134,13 +134,13 @@ pfUI.api.CreateBackdrop = pfUI.api.CreateBackdrop or function(f, inset, legacy, 
     local border = tonumber(border) - 1
     local backdrop = pfUI.backdrop
     if border < 1 then backdrop = pfUI.backdrop_small end
-  	local b = CreateFrame("Frame", nil, f)
-  	b:SetPoint("TOPLEFT", f, "TOPLEFT", -border, border)
-  	b:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", border, -border)
+    local b = CreateFrame("Frame", nil, f)
+    b:SetPoint("TOPLEFT", f, "TOPLEFT", -border, border)
+    b:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", border, -border)
 
     local level = f:GetFrameLevel()
     if level < 1 then
-  	  --f:SetFrameLevel(level + 1)
+      --f:SetFrameLevel(level + 1)
       b:SetFrameLevel(level)
     else
       b:SetFrameLevel(level - 1)
@@ -259,7 +259,17 @@ pfUI.api.CreateScrollChild = pfUI.api.CreateScrollChild or function(name, parent
   parent:SetScrollChild(f)
 
   f:SetScript("OnUpdate", function()
-    this:GetParent():UpdateScrollState()
+    -- WoW 1.12 has no OnScrollRangeChanged event, so we must poll.
+    -- Cache the last seen values and only call UpdateScrollState when
+    -- something actually changed — avoids 60+ redundant calls per second
+    -- per scroll frame when content is static.
+    local range = this:GetParent():GetVerticalScrollRange()
+    local height = this:GetParent():GetHeight()
+    if range ~= this._lastRange or height ~= this._lastHeight then
+      this._lastRange = range
+      this._lastHeight = height
+      this:GetParent():UpdateScrollState()
+    end
   end)
 
   return f
