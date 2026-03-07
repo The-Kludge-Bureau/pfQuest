@@ -953,6 +953,7 @@ function pfMap:UpdateNodes()
   -- refresh all nodes
   local t_nodes = GetTime()
   local n_pins, n_skipped = 0, 0
+  local t_updatenode, t_position = 0, 0
   for addon, _ in pairs(pfMap.nodes) do
     if pfMap.nodes[addon][map] then
       for coords, node in pairs(pfMap.nodes[addon][map]) do
@@ -964,12 +965,14 @@ function pfMap:UpdateNodes()
         -- and nothing has been added/removed from it since the last UpdateNodes call.
         -- pfMap.dirtyNodes[node] is set by AddNode/DeleteNode on any real write.
         -- frame.node ~= node catches coord-slot shifts from insertions/removals.
+        local tu0 = GetTime()
         if pfMap.pins[i].node ~= node or pfMap.dirtyNodes[node] then
           pfMap:UpdateNode(pfMap.pins[i], node, color)
           pfMap.dirtyNodes[node] = nil
         else
           n_skipped = n_skipped + 1
         end
+        t_updatenode = t_updatenode + (GetTime() - tu0)
 
         -- set position (use cached coord parse to avoid strfind alloc)
         local x, y
@@ -992,6 +995,7 @@ function pfMap:UpdateNodes()
         end
 
         -- hide cluster nodes if set
+        local tp0 = GetTime()
         if pfQuest_config["showcluster"] == "0" and pfMap.pins[i].cluster then
           pfMap.pins[i]:Hide()
         -- hide individual quest spawns
@@ -1011,13 +1015,14 @@ function pfMap:UpdateNodes()
 
           pfMap.pins[i]:Show()
         end
+        t_position = t_position + (GetTime() - tp0)
 
         n_pins = n_pins + 1
         i = i + 1
       end
     end
   end
-  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes pins=%d skipped=%d loop=%.4fs", n_pins, n_skipped, GetTime() - t_nodes))
+  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes pins=%d skipped=%d loop=%.4fs (updatenode=%.4fs position/show=%.4fs)", n_pins, n_skipped, GetTime() - t_nodes, t_updatenode, t_position))
 
   -- hide remaining pins
   for j=i, table.getn(pfMap.pins) do
@@ -1164,7 +1169,11 @@ pfMap:SetScript("OnEvent", function()
 
   -- update nodes on world map changes
   if event == "WORLD_MAP_UPDATE" and last_zone ~= zone then
+    local t0 = GetTime()
     pfMap.UpdateNodes()
+    local msg = format("|cffff00ffTIMER WORLD_MAP_UPDATE→UpdateNodes: %.4fs", GetTime() - t0)
+    pfQuest:Debug(msg)
+    DEFAULT_CHAT_FRAME:AddMessage(msg)
     last_zone = zone
   end
 end)
