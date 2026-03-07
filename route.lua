@@ -146,6 +146,9 @@ pfQuest.route.coords = {}
 pfQuest.route.Reset = function(self)
   self.coords = {}
   self.firstnode = nil
+  self.lastDrawX = nil
+  self.lastDrawY = nil
+  self.lastDrawNode = nil
 end
 
 pfQuest.route.AddPoint = function(self, tbl)
