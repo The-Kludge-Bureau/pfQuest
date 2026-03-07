@@ -594,27 +594,15 @@ pfBrowser:SetMovable(true)
 pfBrowser:EnableMouse(true)
 pfBrowser:RegisterEvent("PLAYER_ENTERING_WORLD")
 pfBrowser:SetScript("OnEvent", function()
-  -- show all favorites on login if configured
+  -- queue favorites for incremental processing rather than running all
+  -- Search*ID calls synchronously in one PLAYER_ENTERING_WORLD frame.
+  -- each entry is drained one per OnUpdate tick (see OnUpdate below).
   if pfQuest_config.favonlogin == "1" then
-    -- search units
-    for id, name in pairs(pfBrowser_fav.units) do
-      pfDatabase:SearchMobID(id)
-    end
-
-    -- search objects
-    for id, name in pairs(pfBrowser_fav.objects) do
-      pfDatabase:SearchObjectID(id)
-    end
-
-    -- search items
-    for id, name in pairs(pfBrowser_fav.items) do
-      pfDatabase:SearchItemID(id)
-    end
-
-    -- search quests
-    for id, name in pairs(pfBrowser_fav.quests) do
-      pfDatabase:SearchQuestID(id)
-    end
+    pfBrowser.favqueue = {}
+    for id, name in pairs(pfBrowser_fav.units)   do table.insert(pfBrowser.favqueue, {"units",   id}) end
+    for id, name in pairs(pfBrowser_fav.objects)  do table.insert(pfBrowser.favqueue, {"objects", id}) end
+    for id, name in pairs(pfBrowser_fav.items)    do table.insert(pfBrowser.favqueue, {"items",   id}) end
+    for id, name in pairs(pfBrowser_fav.quests)   do table.insert(pfBrowser.favqueue, {"quests",  id}) end
   end
 end)
 pfBrowser:SetScript("OnMouseDown",function()
@@ -791,6 +779,17 @@ pfBrowser:SetScript("OnUpdate", function()
   this.elapsed = (this.elapsed or 0) + arg1
   if this.elapsed < 0.1 then return end
   this.elapsed = 0
+
+  -- drain one favorite search per tick to spread login cost across frames
+  if pfBrowser.favqueue and table.getn(pfBrowser.favqueue) > 0 then
+    local entry = table.remove(pfBrowser.favqueue, 1)
+    local ftype, id = entry[1], entry[2]
+    if ftype == "units"   then pfDatabase:SearchMobID(id)    end
+    if ftype == "objects" then pfDatabase:SearchObjectID(id) end
+    if ftype == "items"   then pfDatabase:SearchItemID(id)   end
+    if ftype == "quests"  then pfDatabase:SearchQuestID(id)  end
+    pfMap.queue_update = GetTime()
+  end
 
   -- run pending search once debounce interval has elapsed
   if searchPending then
