@@ -1203,8 +1203,20 @@ pfMap:SetScript("OnUpdate", function()
 
   -- process node updates if required
   if pfMap.queue_update and pfMap.queue_update + .25 < GetTime() then
-    pfMap.queue_update = nil
-    pfMap:UpdateNodes()
+    -- don't fire while the quest system still has work pending: each queue entry
+    -- and SearchQuests/UpdateQuestlog call will push queue_update to a newer time,
+    -- so the debounce will settle naturally once the whole batch is done.
+    -- This prevents UpdateNodes from firing between queue entries when a prior
+    -- queue_update stamp happens to be 0.25s old mid-drain.
+    local questBusy = pfQuest and (
+      (pfQuest.queueCount or 0) > 0 or
+      pfQuest.updateQuestGivers or
+      pfQuest.updateQuestLog
+    )
+    if not questBusy then
+      pfMap.queue_update = nil
+      pfMap:UpdateNodes()
+    end
   end
 
   -- reset map to current zone once map is closed
