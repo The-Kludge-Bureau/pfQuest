@@ -1087,8 +1087,14 @@ function pfMap:UpdateMinimap()
   local mZoom = pfMap.drawlayer:GetZoom()
   xPlayer, yPlayer = xPlayer * 100, yPlayer * 100
 
-  -- force refresh every second even without changed values, otherwise skip
-  if this.xPlayer == xPlayer and this.yPlayer == yPlayer and this.mZoom == mZoom then
+  -- Only run the full pin loop when the player has moved at least 0.1 map
+  -- units (squared threshold 0.01) or zoom changed. Sub-threshold movement
+  -- produces sub-pixel pin shifts that are invisible, so redrawing is pure
+  -- waste. Force a refresh once per second regardless so node additions and
+  -- zoom changes always propagate.
+  local dx = xPlayer - (this.xPlayer or xPlayer + 1)
+  local dy = yPlayer - (this.yPlayer or yPlayer + 1)
+  if dx*dx + dy*dy < 0.01 and this.mZoom == mZoom then
     if ( this.tick or 1) > GetTime() then return else this.tick = GetTime() + 1 end
   end
 
@@ -1149,7 +1155,13 @@ function pfMap:UpdateMinimap()
             pfMap.mpins[i] = pfMap:BuildNode(nodename .. i, pfMap.drawlayer)
           end
 
-          pfMap:UpdateNode(pfMap.mpins[i], node, color, "minimap", distance)
+          -- skip expensive UpdateNode work (highlightdb rebuild, node iteration,
+          -- size calls) when this pin is already showing the correct node and
+          -- nothing has been added or removed from it since the last render.
+          if pfMap.mpins[i].node ~= node or pfMap.dirtyNodes[node] then
+            pfMap:UpdateNode(pfMap.mpins[i], node, color, "minimap", distance)
+            pfMap.dirtyNodes[node] = nil
+          end
 
           pfMap.mpins[i].hl:Hide()
 
