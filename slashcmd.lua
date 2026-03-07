@@ -98,7 +98,7 @@ SlashCmdList["PFDB"] = function(input, editbox)
   -- argument: quests
   if (arg1 == "quests") then
     local maps = pfDatabase:SearchQuests(meta)
-    pfMap:UpdateNodes()
+    pfMap.queue_update = GetTime()
     return
   end
 
