@@ -58,16 +58,24 @@ function pfQuest:SortedPairs(t, index, reverse)
   -- collect the keys
   local keys = {}
   for k, v in pairs(t) do
-    if v then keys[table.getn(keys)+1] = k end
+    if v then
+      keys[table.getn(keys) + 1] = k
+    end
   end
 
   local order
   if reverse then
-    order = function(t,a,b) return t[a][index] < t[b][index] end
+    order = function(t, a, b)
+      return t[a][index] < t[b][index]
+    end
   else
-    order = function(t,a,b) return t[a][index] > t[b][index] end
+    order = function(t, a, b)
+      return t[a][index] > t[b][index]
+    end
   end
-  table.sort(keys, function(a,b) return order(t, a, b) end)
+  table.sort(keys, function(a, b)
+    return order(t, a, b)
+  end)
 
   -- return the iterator function
   local i = 0
@@ -80,7 +88,7 @@ function pfQuest:SortedPairs(t, index, reverse)
 end
 
 pfQuest.queue = {}
-pfQuest.queueCount = 0  -- Track queue size to avoid O(n) tsize() calls
+pfQuest.queueCount = 0 -- Track queue size to avoid O(n) tsize() calls
 pfQuest.abandon = ""
 pfQuest.questlog = {}
 pfQuest.questlog_tmp = {}
@@ -111,8 +119,8 @@ pfQuest:SetScript("OnEvent", function()
   elseif event == "SKILL_LINES_CHANGED" then
     -- Use table.concat to avoid string concatenation garbage
     local skillParts = {}
-    for i=0, GetNumSkillLines() do
-      skillParts[i+1] = GetSkillLineInfo(i) or ""
+    for i = 0, GetNumSkillLines() do
+      skillParts[i + 1] = GetSkillLineInfo(i) or ""
     end
     local skills = concat(skillParts)
 
@@ -137,13 +145,21 @@ pfQuest:SetScript("OnEvent", function()
 end)
 
 pfQuest:SetScript("OnUpdate", function()
-  if this.lock and this.lock > GetTime() then return end
-  if not pfDatabase.localized then return end
+  if this.lock and this.lock > GetTime() then
+    return
+  end
+  if not pfDatabase.localized then
+    return
+  end
 
-  if ( this.tick or .05) > GetTime() then return else this.tick = GetTime() + .05 end
+  if (this.tick or 0.05) > GetTime() then
+    return
+  else
+    this.tick = GetTime() + 0.05
+  end
 
   -- check questlog each second
-  if ( this.qlogtick or 1) < GetTime() then
+  if (this.qlogtick or 1) < GetTime() then
     local t0 = GetTime()
     if pfQuest:UpdateQuestlog() then
       pfQuest:Debug(format("Update Quest|cff33ffccLog|r [|cffff3333Tick|r] %.4fs", GetTime() - t0))
@@ -160,9 +176,7 @@ pfQuest:SetScript("OnUpdate", function()
 
   if this.updateQuestGivers == true then
     pfQuest:Debug("Update Quest|cff33ffcc Givers")
-    if pfQuest_config["trackingmethod"] ~= 4 and
-      pfQuest_config["allquestgivers"] == "1"
-    then
+    if pfQuest_config["trackingmethod"] ~= 4 and pfQuest_config["allquestgivers"] == "1" then
       local meta = { ["addon"] = "PFQUEST" }
       local t0 = GetTime()
       pfDatabase:SearchQuests(meta)
@@ -171,11 +185,12 @@ pfQuest:SetScript("OnUpdate", function()
     this.updateQuestGivers = false
   end
 
-  if pfQuest.queueCount == 0 then return end
+  if pfQuest.queueCount == 0 then
+    return
+  end
 
   -- process queue
   for id, entry in pairs(this.queue) do
-
     -- questgivers only need refreshing when quests are added or removed,
     -- not when objectives change (RELOAD). track this before clearing the entry.
     if entry[4] == "NEW" or entry[4] == "REMOVE" then
@@ -193,7 +208,9 @@ pfQuest:SetScript("OnUpdate", function()
         pfQuest_history[entry[2]] = { time(), UnitLevel("player") }
       end
       -- Mark journal dirty when history changes
-      if pfJournal then pfJournal.dirty = true end
+      if pfJournal then
+        pfJournal.dirty = true
+      end
 
       if pfQuest_config["trackingmethod"] ~= 4 then
         -- delete nodes by title
@@ -228,8 +245,9 @@ pfQuest:SetScript("OnUpdate", function()
         pfQuest:Debug(format("|cffffff00TIMER DeleteNode(NEW/RELOAD): %.4fs", GetTime() - t0))
 
         -- skip quest objective detection on manual and tracked mode
-        if pfQuest_config["trackingmethod"] ~= 3 and
-          (pfQuest_config["trackingmethod"] ~= 2 or IsQuestWatched(entry[3]))
+        if
+          pfQuest_config["trackingmethod"] ~= 3
+          and (pfQuest_config["trackingmethod"] ~= 2 or IsQuestWatched(entry[3]))
         then
           local meta = { ["addon"] = "PFQUEST", ["qlogid"] = entry[3] }
           local t1 = GetTime()
@@ -270,7 +288,7 @@ function pfQuest:UpdateQuestlog()
   local change = nil
 
   -- iterate over all quests
-  for qlogid=1,40 do
+  for qlogid = 1, 40 do
     local title, _, _, header, _, complete = compat.GetQuestLogTitle(qlogid)
     local objectives = GetNumQuestLeaderBoards(qlogid)
     local watched, questid, state
@@ -283,10 +301,10 @@ function pfQuest:UpdateQuestlog()
       -- build state string using table.concat (avoid string concat garbage)
       local stateParts = { watched and "track" or "" }
       if objectives then
-        for i=1, objectives, 1 do
+        for i = 1, objectives, 1 do
           local text, _, done = GetQuestLogLeaderBoard(i, qlogid)
-          stateParts[getn(stateParts)+1] = i
-          stateParts[getn(stateParts)+1] = done and "done" or "todo"
+          stateParts[getn(stateParts) + 1] = i
+          stateParts[getn(stateParts) + 1] = done and "done" or "todo"
         end
       end
       state = concat(stateParts)
@@ -374,12 +392,12 @@ StaticPopupDialogs["PFQUEST_URLCOPY"] = {
   whileDead = 1,
   hideOnEscape = 1,
   OnShow = function()
-    local editBox = _G[this:GetName().."WideEditBox"]
+    local editBox = _G[this:GetName() .. "WideEditBox"]
     editBox:SetText(StaticPopupDialogs["PFQUEST_URLCOPY"].data)
     editBox:HighlightText()
   end,
   OnHide = function()
-    _G[this:GetName().."WideEditBox"]:SetText("")
+    _G[this:GetName() .. "WideEditBox"]:SetText("")
   end,
   EditBoxOnEnterPressed = function()
     this:GetParent():Hide()
@@ -394,10 +412,16 @@ StaticPopupDialogs["PFQUEST_URLCOPY"] = {
 }
 
 function pfQuest:AddQuestLogIntegration()
-  if pfQuest_config["questlogbuttons"] ==  "0" then return end
+  if pfQuest_config["questlogbuttons"] == "0" then
+    return
+  end
 
-  local dockFrame = EQL3_QuestLogDetailScrollChildFrame or ShaguQuest_QuestLogDetailScrollChildFrame or QuestLogDetailScrollChildFrame
-  local dockTitle = EQL3_QuestLogDescriptionTitle or ShaguQuest_QuestLogDescriptionTitle or pfQuestCompat.QuestLogDescriptionTitle
+  local dockFrame = EQL3_QuestLogDetailScrollChildFrame
+    or ShaguQuest_QuestLogDetailScrollChildFrame
+    or QuestLogDetailScrollChildFrame
+  local dockTitle = EQL3_QuestLogDescriptionTitle
+    or ShaguQuest_QuestLogDescriptionTitle
+    or pfQuestCompat.QuestLogDescriptionTitle
 
   dockTitle:SetHeight(dockTitle:GetHeight() + 30)
   dockTitle:SetJustifyV("BOTTOM")
@@ -413,9 +437,9 @@ function pfQuest:AddQuestLogIntegration()
     else
       StaticPopupDialogs["PFQUEST_URLCOPY"].data = pfQuest.dburl .. (this:GetID() or 0)
       local dialog = StaticPopup_Show("PFQUEST_URLCOPY")
-      _G[dialog:GetName().."Button1"]:ClearAllPoints()
-      _G[dialog:GetName().."Button1"]:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 16)
-      _G[dialog:GetName().."WideEditBox"]:SetScript('OnTextChanged', StaticPopup_EditBoxOnTextChanged)
+      _G[dialog:GetName() .. "Button1"]:ClearAllPoints()
+      _G[dialog:GetName() .. "Button1"]:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 16)
+      _G[dialog:GetName() .. "WideEditBox"]:SetScript("OnTextChanged", StaticPopup_EditBoxOnTextChanged)
       dialog:SetWidth(420)
     end
   end)
@@ -437,19 +461,21 @@ function pfQuest:AddQuestLogIntegration()
 
   pfQuest.buttonLanguage:SetScript("OnClick", function()
     UIDropDownMenu_Initialize(self, function()
-      local func = function() pfQuest_config.translate = this.value end
+      local func = function()
+        pfQuest_config.translate = this.value
+      end
       local info = {}
       info.text = "|cffaaaaaa" .. pfQuest_Loc["Reset Language"]
       info.value = nil
       info.func = func
-      UIDropDownMenu_AddButton(info);
+      UIDropDownMenu_AddButton(info)
 
       for loc, caption in pairs(pfDB.locales) do
         local info = {}
         info.text = caption
         info.value = loc
         info.func = func
-        UIDropDownMenu_AddButton(info);
+        UIDropDownMenu_AddButton(info)
       end
     end)
     ToggleDropDownMenu(1, nil, self, "cursor", 3, -3)
@@ -460,7 +486,11 @@ function pfQuest:AddQuestLogIntegration()
     local lang = pfQuest_config.translate
 
     if this.translate ~= pfQuest_config.translate then
-      pfQuest.buttonLanguage.txt:SetText("|cff000000[|cff3333ff" .. (pfDB.locales[pfQuest_config.translate] or "|cff333333" .. pfQuest_Loc["Translate"]) .. "|cff000000]")
+      pfQuest.buttonLanguage.txt:SetText(
+        "|cff000000[|cff3333ff"
+          .. (pfDB.locales[pfQuest_config.translate] or "|cff333333" .. pfQuest_Loc["Translate"])
+          .. "|cff000000]"
+      )
       this.translate = pfQuest_config.translate
       QuestLog_UpdateQuestDetails(true)
       return
@@ -489,7 +519,9 @@ function pfQuest:AddQuestLogIntegration()
     local questids = pfDatabase:GetQuestIDs(questIndex)
     local title, _, _, header, _, complete = compat.GetQuestLogTitle(questIndex)
     local id = questids and tonumber(questids[1])
-    if header or not id then return end
+    if header or not id then
+      return
+    end
 
     local maps, meta = {}, { ["addon"] = "PFQUEST", ["qlogid"] = questIndex }
     maps = pfDatabase:SearchQuestID(id, meta, maps)
@@ -504,7 +536,9 @@ function pfQuest:AddQuestLogIntegration()
   pfQuest.buttonHide:SetScript("OnClick", function()
     local questIndex = GetQuestLogSelection()
     local title, _, _, header, _, complete = compat.GetQuestLogTitle(questIndex)
-    if header then return end
+    if header then
+      return
+    end
 
     pfMap:DeleteNode("PFQUEST", title)
   end)
@@ -537,12 +571,14 @@ function pfQuest:AddQuestLogIntegration()
 end
 
 function pfQuest:AddWorldMapIntegration()
-  if pfQuest_config["worldmapmenu"] ==  "0" then return end
+  if pfQuest_config["worldmapmenu"] == "0" then
+    return
+  end
 
   -- Quest Display Selection
   pfQuest.mapButton = CreateFrame("Frame", "pfQuestMapDropdown", WorldMapButton, "UIDropDownMenuTemplate")
   pfQuest.mapButton:ClearAllPoints()
-  pfQuest.mapButton:SetPoint("TOPRIGHT" , 0, -10)
+  pfQuest.mapButton:SetPoint("TOPRIGHT", 0, -10)
   pfQuest.mapButton:SetScript("OnShow", function()
     pfQuest.mapButton.current = tonumber(pfQuest_config["trackingmethod"])
     pfQuest.mapButton:UpdateMenu()
@@ -643,9 +679,13 @@ end
 
 local function UpdateQuestLevel(button, id)
   local title, level, tag, header = compat.GetQuestLogTitle(id)
-  if header or not title then return end
-  button:SetText(" [" .. ( level or "??" ) .. ( tag and "+" or "") .. "] " .. title)
-  if not QuestLogTitleButton_Resize then return end
+  if header or not title then
+    return
+  end
+  button:SetText(" [" .. (level or "??") .. (tag and "+" or "") .. "] " .. title)
+  if not QuestLogTitleButton_Resize then
+    return
+  end
   QuestLogTitleButton_Resize(button)
 end
 
@@ -660,13 +700,13 @@ QuestLog_Update = function()
         UpdateQuestLevel(button, button:GetID())
       end
     else
-      for i=1, QUESTS_DISPLAYED, 1 do
-        UpdateQuestLevel(_G["QuestLogTitle"..i], i + FauxScrollFrame_GetOffset(QuestLogListScrollFrame))
+      for i = 1, QUESTS_DISPLAYED, 1 do
+        UpdateQuestLevel(_G["QuestLogTitle" .. i], i + FauxScrollFrame_GetOffset(QuestLogListScrollFrame))
       end
     end
   end
 
-  if pfQuest_config["questlogbuttons"] ==  "1" then
+  if pfQuest_config["questlogbuttons"] == "1" then
     local questids = pfDatabase:GetQuestIDs(GetQuestLogSelection())
     if questids and questids[1] and tonumber(questids[1]) and pfQuest.questlog[questids[1]] then
       pfQuest.buttonOnline:SetID(questids[1])
@@ -724,8 +764,8 @@ if not GetQuestLink then -- Allow to send questlinks from questlog
   -- Patch ItemRef to display Questlinks
   local pfQuestHookSetItemRef = SetItemRef
   SetItemRef = function(link, text, button)
-    local isQuest, _, id    = string.find(link, "quest:(%d+):.*")
-    local isQuest2, _, _   = string.find(link, "quest2:.*")
+    local isQuest, _, id = string.find(link, "quest:(%d+):.*")
+    local isQuest2, _, _ = string.find(link, "quest2:.*")
 
     if isQuest or isQuest2 then
       if IsShiftKeyDown() and ChatFrameEditBox:IsVisible() then
@@ -760,7 +800,7 @@ if not GetQuestLink then -- Allow to send questlinks from questlog
         local color = pfQuestCompat.GetDifficultyColor(questlevel)
         ItemRefTooltip:AddLine(pfDB["quests"]["loc"][id].T, color.r, color.g, color.b)
       elseif hasTitle then
-        ItemRefTooltip:AddLine(questTitle, 1,1,0)
+        ItemRefTooltip:AddLine(questTitle, 1, 1, 0)
       end
 
       -- scan for active quests
@@ -768,41 +808,51 @@ if not GetQuestLink then -- Allow to send questlinks from questlog
       queststate = pfQuest.questlog[id] and 1 or queststate
 
       if queststate == 0 then
-        ItemRefTooltip:AddLine(pfQuest_Loc["You don't have this quest."] .. "\n\n", 1, .5, .5)
+        ItemRefTooltip:AddLine(pfQuest_Loc["You don't have this quest."] .. "\n\n", 1, 0.5, 0.5)
       elseif queststate == 1 then
-        ItemRefTooltip:AddLine(pfQuest_Loc["You are on this quest."] .. "\n\n", 1, 1, .5)
+        ItemRefTooltip:AddLine(pfQuest_Loc["You are on this quest."] .. "\n\n", 1, 1, 0.5)
       elseif queststate == 2 then
-        ItemRefTooltip:AddLine(pfQuest_Loc["You already did this quest."] .. "\n\n", .5, 1, .5)
+        ItemRefTooltip:AddLine(pfQuest_Loc["You already did this quest."] .. "\n\n", 0.5, 1, 0.5)
       end
 
       -- add database entries if existing
       if pfDB["quests"]["loc"][id] then
         if pfDB["quests"]["loc"][id]["O"] then
-          ItemRefTooltip:AddLine(pfDatabase:FormatQuestText(pfDB["quests"]["loc"][id]["O"]), 1,1,1,true)
+          ItemRefTooltip:AddLine(pfDatabase:FormatQuestText(pfDB["quests"]["loc"][id]["O"]), 1, 1, 1, true)
         end
 
         if pfDB["quests"]["loc"][id]["O"] and pfDB["quests"]["loc"][id]["D"] then
-          ItemRefTooltip:AddLine(" ", 0,0,0)
+          ItemRefTooltip:AddLine(" ", 0, 0, 0)
         end
 
         if pfDB["quests"]["loc"][id]["D"] then
-          ItemRefTooltip:AddLine(pfDatabase:FormatQuestText(pfDB["quests"]["loc"][id]["D"]), .8,.8,.8,true)
+          ItemRefTooltip:AddLine(pfDatabase:FormatQuestText(pfDB["quests"]["loc"][id]["D"]), 0.8, 0.8, 0.8, true)
         end
 
         if pfDB["quests"]["data"][id]["lvl"] or pfDB["quests"]["data"][id]["min"] then
-          ItemRefTooltip:AddLine(" ", 0,0,0)
+          ItemRefTooltip:AddLine(" ", 0, 0, 0)
         end
 
         if pfDB["quests"]["data"][id]["min"] then
           local questlevel = tonumber(pfDB["quests"]["data"][id]["min"])
           local color = pfQuestCompat.GetDifficultyColor(questlevel)
-          ItemRefTooltip:AddLine("|cffffffff" .. pfQuest_Loc["Required Level"] .. ": |r" .. questlevel, color.r, color.g, color.b)
+          ItemRefTooltip:AddLine(
+            "|cffffffff" .. pfQuest_Loc["Required Level"] .. ": |r" .. questlevel,
+            color.r,
+            color.g,
+            color.b
+          )
         end
 
         if pfDB["quests"]["data"][id]["lvl"] then
           local questlevel = tonumber(pfDB["quests"]["data"][id]["lvl"])
           local color = pfQuestCompat.GetDifficultyColor(questlevel)
-          ItemRefTooltip:AddLine("|cffffffff" .. pfQuest_Loc["Quest Level"] .. ": |r" .. questlevel, color.r, color.g, color.b)
+          ItemRefTooltip:AddLine(
+            "|cffffffff" .. pfQuest_Loc["Quest Level"] .. ": |r" .. questlevel,
+            color.r,
+            color.g,
+            color.b
+          )
         end
       end
 
@@ -819,10 +869,14 @@ else
     pfQuestHookSetItemRef(link, text, button)
 
     -- skip modifier clicks
-    if IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown() then return end
+    if IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown() then
+      return
+    end
 
     local quest, _, id = string.find(link, "quest:(%d+):.*")
-    if not quest then return end
+    if not quest then
+      return
+    end
     id = tonumber(id)
 
     -- adjust text color to level color
@@ -839,13 +893,23 @@ else
       if pfDB["quests"]["data"][id]["min"] then
         local questlevel = tonumber(pfDB["quests"]["data"][id]["min"])
         local color = pfQuestCompat.GetDifficultyColor(questlevel)
-        ItemRefTooltip:AddLine("|cffffffff" .. pfQuest_Loc["Required Level"] .. ": |r" .. questlevel, color.r, color.g, color.b)
+        ItemRefTooltip:AddLine(
+          "|cffffffff" .. pfQuest_Loc["Required Level"] .. ": |r" .. questlevel,
+          color.r,
+          color.g,
+          color.b
+        )
       end
 
       if pfDB["quests"]["data"][id]["lvl"] then
         local questlevel = tonumber(pfDB["quests"]["data"][id]["lvl"])
         local color = pfQuestCompat.GetDifficultyColor(questlevel)
-        ItemRefTooltip:AddLine("|cffffffff" .. pfQuest_Loc["Quest Level"] .. ": |r" .. questlevel, color.r, color.g, color.b)
+        ItemRefTooltip:AddLine(
+          "|cffffffff" .. pfQuest_Loc["Quest Level"] .. ": |r" .. questlevel,
+          color.r,
+          color.g,
+          color.b
+        )
       end
     end
 

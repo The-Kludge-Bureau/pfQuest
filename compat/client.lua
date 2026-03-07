@@ -61,8 +61,8 @@ pfQuestCompat.InsertQuestLink = function(questid, name)
 end
 
 -- vanilla+tbc: do the best to detect the minimap arrow
-local minimaparrow = ({Minimap:GetChildren()})[9]
-for k, v in pairs({Minimap:GetChildren()}) do
+local minimaparrow = ({ Minimap:GetChildren() })[9]
+for k, v in pairs({ Minimap:GetChildren() }) do
   if v:IsObjectType("Model") and not v:GetName() then
     if string.find(strlower(v:GetModel()), "interface\\minimap\\minimaparrow") then
       minimaparrow = v
@@ -77,23 +77,26 @@ if minimaparrow then
 end
 
 -- vanilla+tbc: return the player facing based on the minimap arrow
-pfQuestCompat.GetPlayerFacing = GetPlayerFacing or function()
-  if pfQuestCompat.rotateMinimap then
-    return (MiniMapCompassRing:GetFacing() * -1)
-  else
-    return minimaparrow:GetFacing()
+pfQuestCompat.GetPlayerFacing = GetPlayerFacing
+  or function()
+    if pfQuestCompat.rotateMinimap then
+      return (MiniMapCompassRing:GetFacing() * -1)
+    else
+      return minimaparrow:GetFacing()
+    end
   end
-end
 
 -- vanilla: overwrite the out-of-memory popup on vanilla clients, to provide some help
 -- on how to increase the limits, and also displaying a link to an example.
 if client <= 11200 then
-  local memlimit = "The user interface is using more than %dMB of memory.\n\n" ..
-    "Set '|cffffee55Script Memory|r' to '|cffffee550|r' in the addon selection of your character login screen:"
+  local memlimit = "The user interface is using more than %dMB of memory.\n\n"
+    .. "Set '|cffffee55Script Memory|r' to '|cffffee550|r' in the addon selection of your character login screen:"
 
   local striptex = function(frame)
-    for _,v in ipairs({frame:GetRegions()}) do
-      if v.GetTexture and string.find(v:GetTexture(), "ChatInputBorder") then v:Hide() end
+    for _, v in ipairs({ frame:GetRegions() }) do
+      if v.GetTexture and string.find(v:GetTexture(), "ChatInputBorder") then
+        v:Hide()
+      end
     end
   end
 
@@ -104,14 +107,14 @@ if client <= 11200 then
     hasEditBox = 1,
     showAlert = 1,
     OnShow = function()
-      pfUI.api.CreateBackdrop(getglobal(this:GetName().."EditBox"), 3, true)
-      getglobal(this:GetName().."EditBox"):SetText("https://shagu.org/script-memory.jpg")
-      getglobal(this:GetName().."EditBox"):SetTextInsets(5, 5, 5, 5)
-      getglobal(this:GetName().."EditBox"):SetJustifyH("CENTER")
-      getglobal(this:GetName().."EditBox"):SetWidth(220)
-      getglobal(this:GetName().."EditBox"):SetFocus()
-      getglobal(this:GetName().."Button2"):Disable()
-      striptex(getglobal(this:GetName().."EditBox"))
+      pfUI.api.CreateBackdrop(getglobal(this:GetName() .. "EditBox"), 3, true)
+      getglobal(this:GetName() .. "EditBox"):SetText("https://shagu.org/script-memory.jpg")
+      getglobal(this:GetName() .. "EditBox"):SetTextInsets(5, 5, 5, 5)
+      getglobal(this:GetName() .. "EditBox"):SetJustifyH("CENTER")
+      getglobal(this:GetName() .. "EditBox"):SetWidth(220)
+      getglobal(this:GetName() .. "EditBox"):SetFocus()
+      getglobal(this:GetName() .. "Button2"):Disable()
+      striptex(getglobal(this:GetName() .. "EditBox"))
     end,
     OnAccept = function()
       ForceQuit()
@@ -135,7 +138,7 @@ if client <= 11200 then
 
         if level and level > 0 then
           local newhex = pfUI.api.rgbhex(pfQuestCompat.GetDifficultyColor(level))
-          text = string.gsub(text, oldhex .. "|Hquest:"..questid, newhex.."|Hquest:"..questid)
+          text = string.gsub(text, oldhex .. "|Hquest:" .. questid, newhex .. "|Hquest:" .. questid)
         end
       end
     end
@@ -143,8 +146,9 @@ if client <= 11200 then
     frame.pfQuestHookAddMessage(frame, text, a1, a2, a3, a4, a5)
   end
 
-  for i=1,NUM_CHAT_WINDOWS do
-    _G["ChatFrame"..i].pfQuestHookAddMessage = _G["ChatFrame"..i].pfQuestHookAddMessage or _G["ChatFrame"..i].AddMessage
-    _G["ChatFrame"..i].AddMessage = ParseQuestLevels
+  for i = 1, NUM_CHAT_WINDOWS do
+    _G["ChatFrame" .. i].pfQuestHookAddMessage = _G["ChatFrame" .. i].pfQuestHookAddMessage
+      or _G["ChatFrame" .. i].AddMessage
+    _G["ChatFrame" .. i].AddMessage = ParseQuestLevels
   end
 end

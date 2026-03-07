@@ -4,17 +4,17 @@ local getn = table.getn
 local GetTime = GetTime
 
 do -- minimap icon
-  pfQuestIcon = CreateFrame('Button', "pfQuestIcon", Minimap)
+  pfQuestIcon = CreateFrame("Button", "pfQuestIcon", Minimap)
   pfQuestIcon:SetClampedToScreen(true)
   pfQuestIcon:SetMovable(true)
   pfQuestIcon:EnableMouse(true)
-  pfQuestIcon:RegisterForDrag('LeftButton')
-  pfQuestIcon:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
+  pfQuestIcon:RegisterForDrag("LeftButton")
+  pfQuestIcon:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
   pfQuestIcon:SetWidth(31)
   pfQuestIcon:SetHeight(31)
   pfQuestIcon:SetFrameLevel(9)
-  pfQuestIcon:SetHighlightTexture('Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight')
+  pfQuestIcon:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
   pfQuestIcon:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 0, 0)
 
   pfQuestIcon:SetScript("OnDragStart", function()
@@ -56,28 +56,28 @@ do -- minimap icon
     end
   end)
 
-  pfQuestIcon.icon = pfQuestIcon:CreateTexture(nil, 'BACKGROUND')
+  pfQuestIcon.icon = pfQuestIcon:CreateTexture(nil, "BACKGROUND")
   pfQuestIcon.icon:SetWidth(20)
   pfQuestIcon.icon:SetHeight(20)
-  pfQuestIcon.icon:SetTexture(pfQuestConfig.path..'\\img\\logo')
+  pfQuestIcon.icon:SetTexture(pfQuestConfig.path .. "\\img\\logo")
   pfQuestIcon.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-  pfQuestIcon.icon:SetPoint('CENTER',1,1)
+  pfQuestIcon.icon:SetPoint("CENTER", 1, 1)
 
-  pfQuestIcon.overlay = pfQuestIcon:CreateTexture(nil, 'OVERLAY')
+  pfQuestIcon.overlay = pfQuestIcon:CreateTexture(nil, "OVERLAY")
   pfQuestIcon.overlay:SetWidth(53)
   pfQuestIcon.overlay:SetHeight(53)
-  pfQuestIcon.overlay:SetTexture('Interface\\Minimap\\MiniMap-TrackingBorder')
-  pfQuestIcon.overlay:SetPoint('TOPLEFT', 0,0)
+  pfQuestIcon.overlay:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  pfQuestIcon.overlay:SetPoint("TOPLEFT", 0, 0)
 end
 
 do -- tracking menu
   local function MenuButtonEnter()
-    this.title:SetTextColor(1,.8,0)
+    this.title:SetTextColor(1, 0.8, 0)
     this.highlight:Show()
   end
 
   local function MenuButtonLeave()
-    this.title:SetTextColor(1,1,1)
+    this.title:SetTextColor(1, 1, 1)
     this.highlight:Hide()
   end
 
@@ -102,7 +102,7 @@ do -- tracking menu
     frame:SetClampedToScreen(true)
     frame:Hide()
 
-    pfUI.api.CreateBackdrop(frame, nil, nil, .75)
+    pfUI.api.CreateBackdrop(frame, nil, nil, 0.75)
 
     for id, tracking in pairs(data) do
       -- data shortcuts
@@ -114,9 +114,9 @@ do -- tracking menu
       if not title then
         -- draw separator line
         local line = frame:CreateTexture()
-        line:SetTexture(.25 ,.25, .25, .25)
-        line:SetPoint("TOPLEFT", 4, -top-2)
-        line:SetPoint("TOPRIGHT", -4, -top-2)
+        line:SetTexture(0.25, 0.25, 0.25, 0.25)
+        line:SetPoint("TOPLEFT", 4, -top - 2)
+        line:SetPoint("TOPRIGHT", -4, -top - 2)
         line:SetHeight(2)
       else
         -- create menu button
@@ -142,13 +142,13 @@ do -- tracking menu
         frame[name].icon:SetWidth(14)
         frame[name].icon:SetHeight(14)
         frame[name].icon:SetPoint("RIGHT", -8, 0)
-        frame[name].icon:SetTexture(pfQuestConfig.path.."\\img\\tracking\\"..name)
+        frame[name].icon:SetTexture(pfQuestConfig.path .. "\\img\\tracking\\" .. name)
 
         -- hover
         frame[name].highlight = frame[name]:CreateTexture(nil, "OVERLAY")
         frame[name].highlight:SetPoint("TOPLEFT", 4, 0)
         frame[name].highlight:SetPoint("BOTTOMRIGHT", -4, 0)
-        frame[name].highlight:SetTexture(1,1,1,.1)
+        frame[name].highlight:SetTexture(1, 1, 1, 0.1)
         frame[name].highlight:Hide()
 
         -- checkbox (optional)
@@ -160,7 +160,7 @@ do -- tracking menu
           frame[name].check:SetPoint("LEFT", 10, 0)
           frame[name].check:SetWidth(20)
           frame[name].check:SetHeight(20)
-          frame[name].check:SetScale(.6)
+          frame[name].check:SetScale(0.6)
           frame[name].check:EnableMouse(false)
           pfUI.api.CreateBackdrop(frame[name].check, nil, true)
         end
@@ -180,39 +180,69 @@ do -- tracking menu
     -- the usual menu hide events
     table.insert(UIMenus, name)
     frame:RegisterEvent("CURSOR_UPDATE")
-    frame:SetScript("OnEvent", function() this:Hide() end)
+    frame:SetScript("OnEvent", function()
+      this:Hide()
+    end)
 
     return frame
   end
 
   local function ToggleFrame(frame)
-    if frame:IsShown() then frame:Hide() else frame:Show() end
+    if frame:IsShown() then
+      frame:Hide()
+    else
+      frame:Show()
+    end
   end
 
   local menu = {
-    {"database", pfQuest_Loc["Database"], function(list, state) ToggleFrame(pfBrowser) end },
-    {"-"},
-    {"chests", pfQuest_Loc["Chests & Treasures"], pfDatabase.TrackMeta, true},
-    {"herbs", pfQuest_Loc["Herbs & Flowers"], pfDatabase.TrackMeta, true},
-    {"mines", pfQuest_Loc["Mines & Ores"], pfDatabase.TrackMeta, true},
-    {"fish", pfQuest_Loc["Fishing Pools"], pfDatabase.TrackMeta, true},
-    {"rares", pfQuest_Loc["Rare Mobs"], pfDatabase.TrackMeta, true},
-    {"-"},
-    {"auctioneer", pfQuest_Loc["Auctioneer"], pfDatabase.TrackMeta, true},
-    {"banker", pfQuest_Loc["Banker"], pfDatabase.TrackMeta, true},
-    {"battlemaster", pfQuest_Loc["Battlemaster"], pfDatabase.TrackMeta, true},
-    {"flight", pfQuest_Loc["Flight Master"], pfDatabase.TrackMeta, true},
-    {"innkeeper", pfQuest_Loc["Innkeeper"], pfDatabase.TrackMeta, true},
-    {"mailbox", pfQuest_Loc["Mailbox"], pfDatabase.TrackMeta, true},
-    {"meetingstone", pfQuest_Loc["Meeting Stones"], pfDatabase.TrackMeta, true},
-    {"repair", pfQuest_Loc["Repair"], pfDatabase.TrackMeta, true},
-    {"spirithealer", pfQuest_Loc["Spirit Healer"], pfDatabase.TrackMeta, true},
-    {"stablemaster", pfQuest_Loc["Stable Master"], pfDatabase.TrackMeta, true},
-    {"vendor", pfQuest_Loc["Vendor"], pfDatabase.TrackMeta, true},
-    {"-"},
-    {"journal", pfQuest_Loc["Quest Journal"], function(list, state) ToggleFrame(pfJournal) end},
-    {"welcome", pfQuest_Loc["Welcome Screen"], function(list, state) ToggleFrame(pfQuestInit) end},
-    {"settings", pfQuest_Loc["Settings"], function(list, state) ToggleFrame(pfQuestConfig) end }
+    {
+      "database",
+      pfQuest_Loc["Database"],
+      function(list, state)
+        ToggleFrame(pfBrowser)
+      end,
+    },
+    { "-" },
+    { "chests", pfQuest_Loc["Chests & Treasures"], pfDatabase.TrackMeta, true },
+    { "herbs", pfQuest_Loc["Herbs & Flowers"], pfDatabase.TrackMeta, true },
+    { "mines", pfQuest_Loc["Mines & Ores"], pfDatabase.TrackMeta, true },
+    { "fish", pfQuest_Loc["Fishing Pools"], pfDatabase.TrackMeta, true },
+    { "rares", pfQuest_Loc["Rare Mobs"], pfDatabase.TrackMeta, true },
+    { "-" },
+    { "auctioneer", pfQuest_Loc["Auctioneer"], pfDatabase.TrackMeta, true },
+    { "banker", pfQuest_Loc["Banker"], pfDatabase.TrackMeta, true },
+    { "battlemaster", pfQuest_Loc["Battlemaster"], pfDatabase.TrackMeta, true },
+    { "flight", pfQuest_Loc["Flight Master"], pfDatabase.TrackMeta, true },
+    { "innkeeper", pfQuest_Loc["Innkeeper"], pfDatabase.TrackMeta, true },
+    { "mailbox", pfQuest_Loc["Mailbox"], pfDatabase.TrackMeta, true },
+    { "meetingstone", pfQuest_Loc["Meeting Stones"], pfDatabase.TrackMeta, true },
+    { "repair", pfQuest_Loc["Repair"], pfDatabase.TrackMeta, true },
+    { "spirithealer", pfQuest_Loc["Spirit Healer"], pfDatabase.TrackMeta, true },
+    { "stablemaster", pfQuest_Loc["Stable Master"], pfDatabase.TrackMeta, true },
+    { "vendor", pfQuest_Loc["Vendor"], pfDatabase.TrackMeta, true },
+    { "-" },
+    {
+      "journal",
+      pfQuest_Loc["Quest Journal"],
+      function(list, state)
+        ToggleFrame(pfJournal)
+      end,
+    },
+    {
+      "welcome",
+      pfQuest_Loc["Welcome Screen"],
+      function(list, state)
+        ToggleFrame(pfQuestInit)
+      end,
+    },
+    {
+      "settings",
+      pfQuest_Loc["Settings"],
+      function(list, state)
+        ToggleFrame(pfQuestConfig)
+      end,
+    },
   }
 
   pfQuestMenu = CreateMenu(menu, "pfQuestMenu")
@@ -239,7 +269,7 @@ do -- tracking menu
 
     -- set frame position
     frame:ClearAllPoints()
-    frame:SetPoint(h..w, anchor, "CENTER", wp, hp)
+    frame:SetPoint(h .. w, anchor, "CENTER", wp, hp)
 
     -- align menu entries to config state
     for id, data in pairs(menu) do

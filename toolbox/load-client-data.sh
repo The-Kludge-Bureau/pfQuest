@@ -10,7 +10,7 @@ if [ -f "$rootsql" ]; then
 fi
 
 function Run() {
-  echo "- $1" &&  $1
+  echo "- $1" && $1
 }
 
 function WorldMapOverlay() {
@@ -50,7 +50,6 @@ EOF
     done
   fi
 }
-
 
 function AreaTrigger() {
   cat >> $rootsql << EOF
@@ -129,19 +128,19 @@ EOF
       factiontemplate=$(echo $line | cut -d "," -f 1)
       faction=$(echo $line | cut -d "," -f 2)
       friendly=$(echo $line | cut -d "," -f 5) # field 5
-      hostile=$(echo $line | cut -d "," -f 6) # field 6
+      hostile=$(echo $line | cut -d "," -f 6)  # field 6
 
-      if [ $(( 4 & $hostile )) != 0 ] || [ $hostile = 1 ]; then
+      if [ $((4 & $hostile)) != 0 ] || [ $hostile = 1 ]; then
         horde=-1
-      elif [ $(( 4 & $friendly )) != 0 ] || [ $friendly = 1 ]; then
+      elif [ $((4 & $friendly)) != 0 ] || [ $friendly = 1 ]; then
         horde=1
       else
         horde=0
       fi
 
-      if [ $(( 2 & $hostile )) != 0 ] || [ $hostile = 1 ]; then
+      if [ $((2 & $hostile)) != 0 ] || [ $hostile = 1 ]; then
         alliance=-1
-      elif [ $(( 2 & $friendly )) != 0 ] || [ $friendly = 1 ]; then
+      elif [ $((2 & $friendly)) != 0 ] || [ $friendly = 1 ]; then
         alliance=1
       else
         alliance=0
@@ -264,7 +263,6 @@ CREATE TABLE \`AreaTable_${v}\` (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=FIXED COMMENT='AreaTable';
 
 EOF
-
 
   index=0
   for loc in $locales; do

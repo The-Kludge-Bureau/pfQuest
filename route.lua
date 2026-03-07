@@ -3,7 +3,9 @@ local pairs = pairs
 local floor, ceil, sqrt, abs = math.floor, math.ceil, math.sqrt, math.abs
 local sin, cos, rad, pi = math.sin, math.cos, math.rad, math.pi
 -- WoW's global atan2 returns degrees; fallback for clients without it
-local atan2 = atan2 or function(x, y) return math.deg(math.atan2(x, y)) end
+local atan2 = atan2 or function(x, y)
+  return math.deg(math.atan2(x, y))
+end
 local min, max = math.min, math.max
 local getn, insert, sort = table.getn, table.insert, table.sort
 local GetTime = GetTime
@@ -12,12 +14,14 @@ local GetTime = GetTime
 -- are using a named index on which setn is not updated
 local function tablesize(tbl)
   local count = 0
-  for _ in pairs(tbl) do count = count + 1 end
+  for _ in pairs(tbl) do
+    count = count + 1
+  end
   return count
 end
 
 local function modulo(val, by)
-  return val - floor(val/by)*by;
+  return val - floor(val / by) * by
 end
 
 local function GetNearest(xstart, ystart, db, blacklist)
@@ -26,9 +30,9 @@ local function GetNearest(xstart, ystart, db, blacklist)
 
   for id, data in pairs(db) do
     if data[1] and data[2] and not blacklist[id] then
-      local x,y = xstart - data[1], ystart - data[2]
+      local x, y = xstart - data[1], ystart - data[2]
       -- Use squared distance for comparison (avoid sqrt)
-      local distSq = x*x + y*y
+      local distSq = x * x + y * y
 
       if not nearest or distSq < nearest then
         nearest = distSq
@@ -37,7 +41,9 @@ local function GetNearest(xstart, ystart, db, blacklist)
     end
   end
 
-  if not best then return end
+  if not best then
+    return
+  end
 
   blacklist[best] = true
   return db[best]
@@ -57,7 +63,7 @@ local function ClearPath(path)
   end
 end
 
-local function DrawLine(path,x,y,nx,ny,hl,minimap)
+local function DrawLine(path, x, y, nx, ny, hl, minimap)
   local display = true
   local zoom = 1
 
@@ -78,28 +84,30 @@ local function DrawLine(path,x,y,nx,ny,hl,minimap)
     -- calculate drawlayer size
     xdraw = pfMap.drawlayer:GetWidth() / (mapZoom / mapWidth) / 100
     ydraw = pfMap.drawlayer:GetHeight() / (mapZoom / mapHeight) / 100
-    zoom = (((mapZoom / mapWidth))+((mapZoom / mapHeight))) * 3
+    zoom = ((mapZoom / mapWidth) + (mapZoom / mapHeight)) * 3
   end
 
   -- general
   local dx, dy = x - nx, y - ny
-  local dots = ceil(math.sqrt(dx*1.5*dx*1.5+dy*dy)) / zoom
+  local dots = ceil(math.sqrt(dx * 1.5 * dx * 1.5 + dy * dy)) / zoom
 
-  for i=(minimap and 1 or 2), dots-(minimap and 1 or 2) do
-    local xpos = nx + dx/dots*i
-    local ypos = ny + dy/dots*i
+  for i = (minimap and 1 or 2), dots - (minimap and 1 or 2) do
+    local xpos = nx + dx / dots * i
+    local ypos = ny + dy / dots * i
 
     if minimap then
       -- adjust values to minimap
-      xpos = ( xplayer - xpos ) * xdraw
-      ypos = ( yplayer - ypos ) * ydraw
+      xpos = (xplayer - xpos) * xdraw
+      ypos = (yplayer - ypos) * ydraw
 
       -- check if dot should be visible
       if pfUI.minimap then
-        display = ( abs(xpos) + 1 < pfMap.drawlayer:GetWidth() / 2 and abs(ypos) + 1 < pfMap.drawlayer:GetHeight()/2 ) and true or nil
+        display = (abs(xpos) + 1 < pfMap.drawlayer:GetWidth() / 2 and abs(ypos) + 1 < pfMap.drawlayer:GetHeight() / 2)
+            and true
+          or nil
       else
         local distance = sqrt(xpos * xpos + ypos * ypos)
-        display = ( distance + 1 < pfMap.drawlayer:GetWidth() / 2 ) and true or nil
+        display = (distance + 1 < pfMap.drawlayer:GetWidth() / 2) and true or nil
       end
     else
       -- adjust values to worldmap
@@ -110,19 +118,22 @@ local function DrawLine(path,x,y,nx,ny,hl,minimap)
     if display then
       local nline = tablesize(path) + 1
       for id, tex in pairs(path) do
-        if not tex.enable then nline = id break end
+        if not tex.enable then
+          nline = id
+          break
+        end
       end
 
       path[nline] = path[nline] or (minimap and pfMap.drawlayer or WorldMapButton.routes):CreateTexture(nil, "OVERLAY")
       path[nline]:SetWidth(4)
       path[nline]:SetHeight(4)
-      path[nline]:SetTexture(pfQuestConfig.path.."\\img\\route")
+      path[nline]:SetTexture(pfQuestConfig.path .. "\\img\\route")
       if hl and minimap then
-        path[nline]:SetVertexColor(.6,.4,.2,.5)
+        path[nline]:SetVertexColor(0.6, 0.4, 0.2, 0.5)
       elseif hl then
-        path[nline]:SetVertexColor(1,.8,.4,1)
+        path[nline]:SetVertexColor(1, 0.8, 0.4, 1)
       else
-        path[nline]:SetVertexColor(.6,.4,.2,1)
+        path[nline]:SetVertexColor(0.6, 0.4, 0.2, 1)
       end
 
       path[nline]:ClearAllPoints()
@@ -158,10 +169,14 @@ end
 
 local targetTitle, targetCluster, targetLayer, targetTexture = nil, nil, nil, nil
 pfQuest.route.SetTarget = function(node, default)
-  if node and ( node.title ~= targetTitle
-    or node.cluster ~= targetCluster
-    or node.layer ~= targetLayer
-    or node.texture ~= targetTexture )
+  if
+    node
+    and (
+      node.title ~= targetTitle
+      or node.cluster ~= targetCluster
+      or node.layer ~= targetLayer
+      or node.texture ~= targetTexture
+    )
   then
     pfMap.queue_update = true
   end
@@ -174,7 +189,9 @@ end
 
 pfQuest.route.IsTarget = function(node)
   if node then
-    if targetTitle and targetTitle == node.title
+    if
+      targetTitle
+      and targetTitle == node.title
       and targetCluster == node.cluster
       and targetLayer == node.layer
       and targetTexture == node.texture
@@ -186,17 +203,27 @@ pfQuest.route.IsTarget = function(node)
 end
 
 local lastpos, completed = 0, 0
-local function sortfunc(a,b) return a[4] < b[4] end
+local function sortfunc(a, b)
+  return a[4] < b[4]
+end
 pfQuest.route:SetScript("OnUpdate", function()
   local xplayer, yplayer = GetPlayerMapPosition("player")
   local wrongmap = xplayer == 0 and yplayer == 0 and true or nil
   local curpos = xplayer + yplayer
 
   -- limit distance and route updates to once per .1 seconds
-  if ( this.tick or 5) > GetTime() and lastpos == curpos then return else this.tick = GetTime() + 1 end
+  if (this.tick or 5) > GetTime() and lastpos == curpos then
+    return
+  else
+    this.tick = GetTime() + 1
+  end
 
   -- limit to a maxium of each .05 seconds even on position change
-  if ( this.throttle or .2) > GetTime() then return else this.throttle = GetTime() + .05 end
+  if (this.throttle or 0.2) > GetTime() then
+    return
+  else
+    this.throttle = GetTime() + 0.05
+  end
 
   -- save current position
   lastpos = curpos
@@ -204,8 +231,8 @@ pfQuest.route:SetScript("OnUpdate", function()
   -- update distances to player
   for id, data in ipairs(this.coords) do
     if data[1] and data[2] then
-      local x, y = (xplayer*100 - data[1])*1.5, yplayer*100 - data[2]
-      this.coords[id][4] = ceil(math.sqrt(x*x+y*y)*100)/100
+      local x, y = (xplayer * 100 - data[1]) * 1.5, yplayer * 100 - data[2]
+      this.coords[id][4] = ceil(math.sqrt(x * x + y * y) * 100) / 100
     end
   end
   -- sort all coords by distance only once per second
@@ -243,7 +270,14 @@ pfQuest.route:SetScript("OnUpdate", function()
   end
 
   -- show arrow when route exists and is stable
-  if not wrongmap and this.coords[1] and this.coords[1][4] and not this.arrow:IsShown() and pfQuest_config["arrow"] == "1" and GetTime() > completed + 1 then
+  if
+    not wrongmap
+    and this.coords[1]
+    and this.coords[1][4]
+    and not this.arrow:IsShown()
+    and pfQuest_config["arrow"] == "1"
+    and GetTime() > completed + 1
+  then
     this.arrow:Show()
   end
 
@@ -256,22 +290,27 @@ pfQuest.route:SetScript("OnUpdate", function()
   end
 
   -- check first node for changes
-  if this.firstnode ~= tostring(this.coords[1][1]..this.coords[1][2]) then
-    this.firstnode = tostring(this.coords[1][1]..this.coords[1][2])
+  if this.firstnode ~= tostring(this.coords[1][1] .. this.coords[1][2]) then
+    this.firstnode = tostring(this.coords[1][1] .. this.coords[1][2])
 
     -- recalculate objective paths
     local route = { [1] = this.coords[1] }
     local blacklist = { [1] = true }
-    for i=2, table.getn(this.coords) do
-      if route[i-1] then -- make sure the route was not blacklisted
-        route[i] = GetNearest(route[i-1][1],route[i-1][2],this.coords, blacklist)
+    for i = 2, table.getn(this.coords) do
+      if route[i - 1] then -- make sure the route was not blacklisted
+        route[i] = GetNearest(route[i - 1][1], route[i - 1][2], this.coords, blacklist)
       end
 
       -- remove other item requirement gameobjects of same type from route
       if route[i] and route[i][3] and route[i][3].itemreq then
         for id, data in ipairs(this.coords) do
-          if not blacklist[id] and data[1] and data[2] and data[3]
-            and data[3].itemreq and data[3].itemreq == route[i][3].itemreq
+          if
+            not blacklist[id]
+            and data[1]
+            and data[2]
+            and data[3]
+            and data[3].itemreq
+            and data[3].itemreq == route[i][3].itemreq
           then
             blacklist[id] = true
           end
@@ -282,7 +321,7 @@ pfQuest.route:SetScript("OnUpdate", function()
     ClearPath(objectivepath)
     for i, data in pairs(route) do
       if i > 1 then
-        DrawLine(objectivepath, route[i-1][1],route[i-1][2],route[i][1],route[i][2])
+        DrawLine(objectivepath, route[i - 1][1], route[i - 1][2], route[i][1], route[i][2])
       end
     end
 
@@ -302,12 +341,12 @@ pfQuest.route:SetScript("OnUpdate", function()
     -- of distance, so sub-threshold redraws are pure waste.
     -- also invalidate when the target node changed (firstnode flip).
     local px, py = xplayer * 100, yplayer * 100
-    local dx = (this.lastDrawX or px+1) - px
-    local dy = (this.lastDrawY or py+1) - py
-    local moved = dx*dx + dy*dy
+    local dx = (this.lastDrawX or px + 1) - px
+    local dy = (this.lastDrawY or py + 1) - py
+    local moved = dx * dx + dy * dy
     local targetChanged = this.lastDrawNode ~= this.firstnode
 
-    if moved > 0.09 or targetChanged then  -- threshold: 0.3 map units squared
+    if moved > 0.09 or targetChanged then -- threshold: 0.3 map units squared
       this.lastDrawX = px
       this.lastDrawY = py
       this.lastDrawNode = this.firstnode
@@ -339,7 +378,7 @@ pfQuest.route.arrow:SetHeight(36)
 pfQuest.route.arrow:SetClampedToScreen(true)
 pfQuest.route.arrow:SetMovable(true)
 pfQuest.route.arrow:EnableMouse(true)
-pfQuest.route.arrow:RegisterForDrag('LeftButton')
+pfQuest.route.arrow:RegisterForDrag("LeftButton")
 pfQuest.route.arrow:SetScript("OnDragStart", function()
   if IsShiftKeyDown() then
     this:StartMoving()
@@ -360,7 +399,9 @@ local r, g, b
 
 pfQuest.route.arrow:SetScript("OnUpdate", function()
   -- abort if the frame is not initialized yet
-  if not this.parent then return end
+  if not this.parent then
+    return
+  end
 
   xplayer, yplayer = GetPlayerMapPosition("player")
   wrongmap = xplayer == 0 and yplayer == 0 and true or nil
@@ -382,18 +423,20 @@ pfQuest.route.arrow:SetScript("OnUpdate", function()
   -- arrow positioning stolen from TomTomVanilla.
   -- all credits to the original authors:
   -- https://github.com/cralor/TomTomVanilla
-  xDelta = (target[1] - xplayer*100)*1.5
-  yDelta = (target[2] - yplayer*100)
-  dir = atan2(xDelta, -(yDelta))
-  dir = dir > 0 and (math.pi*2) - dir or -dir
-  if dir < 0 then dir = dir + 360 end
+  xDelta = (target[1] - xplayer * 100) * 1.5
+  yDelta = (target[2] - yplayer * 100)
+  dir = atan2(xDelta, -yDelta)
+  dir = dir > 0 and (math.pi * 2) - dir or -dir
+  if dir < 0 then
+    dir = dir + 360
+  end
   angle = math.rad(dir)
 
   player = pfQuestCompat.GetPlayerFacing()
   angle = angle - player
   perc = math.abs(((math.pi - math.abs(angle)) / math.pi))
-  r, g, b = pfUI.api.GetColorGradient(floor(perc*100)/100)
-  cell = modulo(floor(angle / (math.pi*2) * 108 + 0.5), 108)
+  r, g, b = pfUI.api.GetColorGradient(floor(perc * 100) / 100)
+  cell = modulo(floor(angle / (math.pi * 2) * 108 + 0.5), 108)
   column = modulo(cell, 9)
   row = floor(cell / 9)
   xstart = (column * 56) / 512
@@ -409,7 +452,7 @@ pfQuest.route.arrow:SetScript("OnUpdate", function()
 
   alpha = target[4] - area
   alpha = alpha > 1 and 1 or alpha
-  alpha = alpha < .5 and .5 or alpha
+  alpha = alpha < 0.5 and 0.5 or alpha
 
   texalpha = (1 - alpha) * 2
   texalpha = texalpha > 1 and 1 or texalpha
@@ -418,8 +461,8 @@ pfQuest.route.arrow:SetScript("OnUpdate", function()
   r, g, b = r + texalpha, g + texalpha, b + texalpha
 
   -- update arrow
-  this.model:SetTexCoord(xstart,xend,ystart,yend)
-  this.model:SetVertexColor(r,g,b)
+  this.model:SetTexCoord(xstart, xend, ystart, yend)
+  this.model:SetVertexColor(r, g, b)
 
   -- recalculate values on target change
   if target ~= lasttarget then
@@ -433,34 +476,31 @@ pfQuest.route.arrow:SetScript("OnUpdate", function()
     if target[3].texture then
       this.texture:SetTexture(target[3].texture)
 
-      if target[3].vertex and ( target[3].vertex[1] > 0
-        or target[3].vertex[2] > 0
-        or target[3].vertex[3] > 0 )
-      then
+      if target[3].vertex and (target[3].vertex[1] > 0 or target[3].vertex[2] > 0 or target[3].vertex[3] > 0) then
         this.texture:SetVertexColor(unpack(target[3].vertex))
       else
-        this.texture:SetVertexColor(1,1,1,1)
+        this.texture:SetVertexColor(1, 1, 1, 1)
       end
     else
-      this.texture:SetTexture(pfQuestConfig.path.."\\img\\node")
+      this.texture:SetTexture(pfQuestConfig.path .. "\\img\\node")
       this.texture:SetVertexColor(pfMap.str2rgb(target[3].title))
     end
 
     -- update arrow texts
     local level = target[3].qlvl and "[" .. target[3].qlvl .. "] " or ""
-    this.title:SetText(color..level..target[3].title.."|r")
+    this.title:SetText(color .. level .. target[3].title .. "|r")
     local desc = target[3].description or ""
     if not pfUI or not pfUI.uf then
-      this.description:SetTextColor(1,.9,.7,1)
+      this.description:SetTextColor(1, 0.9, 0.7, 1)
       desc = string.gsub(desc, "ff33ffcc", "ffffffff")
     end
-    this.description:SetText(desc.."|r.")
+    this.description:SetText(desc .. "|r.")
   end
 
   -- only refresh distance text on change
-  local distance = floor(target[4]*10)/10
+  local distance = floor(target[4] * 10) / 10
   if distance ~= this.distance.number then
-    this.distance:SetText("|cffaaaaaa" .. pfQuest_Loc["Distance"] .. ": "..string.format("%.1f", distance))
+    this.distance:SetText("|cffaaaaaa" .. pfQuest_Loc["Distance"] .. ": " .. string.format("%.1f", distance))
     this.distance.number = distance
   end
 
@@ -475,26 +515,26 @@ pfQuest.route.arrow.texture:SetHeight(28)
 pfQuest.route.arrow.texture:SetPoint("BOTTOM", 0, 0)
 
 pfQuest.route.arrow.model = pfQuest.route.arrow:CreateTexture("pfQuestRouteArrow", "MEDIUM")
-pfQuest.route.arrow.model:SetTexture(pfQuestConfig.path.."\\img\\arrow")
-pfQuest.route.arrow.model:SetTexCoord(0,0,0.109375,0.08203125)
+pfQuest.route.arrow.model:SetTexture(pfQuestConfig.path .. "\\img\\arrow")
+pfQuest.route.arrow.model:SetTexCoord(0, 0, 0.109375, 0.08203125)
 pfQuest.route.arrow.model:SetAllPoints()
 
 pfQuest.route.arrow.title = pfQuest.route.arrow:CreateFontString("pfQuestRouteText", "HIGH", "GameFontWhite")
 pfQuest.route.arrow.title:SetPoint("TOP", pfQuest.route.arrow.model, "BOTTOM", 0, -10)
-pfQuest.route.arrow.title:SetFont(pfUI.font_default, pfUI_config.global.font_size+1, "OUTLINE")
-pfQuest.route.arrow.title:SetTextColor(1,.8,0)
+pfQuest.route.arrow.title:SetFont(pfUI.font_default, pfUI_config.global.font_size + 1, "OUTLINE")
+pfQuest.route.arrow.title:SetTextColor(1, 0.8, 0)
 pfQuest.route.arrow.title:SetJustifyH("CENTER")
 
 pfQuest.route.arrow.description = pfQuest.route.arrow:CreateFontString("pfQuestRouteText", "HIGH", "GameFontWhite")
 pfQuest.route.arrow.description:SetPoint("TOP", pfQuest.route.arrow.title, "BOTTOM", 0, -2)
 pfQuest.route.arrow.description:SetFont(pfUI.font_default, pfUI_config.global.font_size, "OUTLINE")
-pfQuest.route.arrow.description:SetTextColor(1,1,1)
+pfQuest.route.arrow.description:SetTextColor(1, 1, 1)
 pfQuest.route.arrow.description:SetJustifyH("CENTER")
 
 pfQuest.route.arrow.distance = pfQuest.route.arrow:CreateFontString("pfQuestRouteDistance", "HIGH", "GameFontWhite")
 pfQuest.route.arrow.distance:SetPoint("TOP", pfQuest.route.arrow.description, "BOTTOM", 0, -2)
-pfQuest.route.arrow.distance:SetFont(pfUI.font_default, pfUI_config.global.font_size-1, "OUTLINE")
-pfQuest.route.arrow.distance:SetTextColor(.8,.8,.8)
+pfQuest.route.arrow.distance:SetFont(pfUI.font_default, pfUI_config.global.font_size - 1, "OUTLINE")
+pfQuest.route.arrow.distance:SetTextColor(0.8, 0.8, 0.8)
 pfQuest.route.arrow.distance:SetJustifyH("CENTER")
 
 pfQuest.route.arrow.parent = pfQuest.route

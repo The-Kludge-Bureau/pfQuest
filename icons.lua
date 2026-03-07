@@ -15,9 +15,9 @@ do -- /db track mines
   pfDatabase:AddCustomIcon(-1734, "img\\tracking\\mines\\Gold") -- Gold Vein
   pfDatabase:AddCustomIcon(-73941, "img\\tracking\\mines\\Gold") -- Ooze Covered Gold Vein
   pfDatabase:AddCustomIcon(-2040, "img\\tracking\\mines\\Mithril") -- Mithril Deposit
-  pfDatabase:AddCustomIcon(-123310,"img\\tracking\\mines\\Mithril") -- Ooze Covered Mithril Deposit
+  pfDatabase:AddCustomIcon(-123310, "img\\tracking\\mines\\Mithril") -- Ooze Covered Mithril Deposit
   pfDatabase:AddCustomIcon(-2047, "img\\tracking\\mines\\TrueSilver") -- Truesilver Deposit
-  pfDatabase:AddCustomIcon(-123309,"img\\tracking\\mines\\TrueSilver") -- Ooze Covered Truesilver Deposit
+  pfDatabase:AddCustomIcon(-123309, "img\\tracking\\mines\\TrueSilver") -- Ooze Covered Truesilver Deposit
   pfDatabase:AddCustomIcon(-324, "img\\tracking\\mines\\Thorium") -- Small Thorium Vein
   pfDatabase:AddCustomIcon(-123848, "img\\tracking\\mines\\Thorium") -- Ooze Covered Thorium Vein
   pfDatabase:AddCustomIcon(-180215, "img\\tracking\\mines\\Thorium") -- Hakkari Thorium Vein

@@ -148,7 +148,7 @@ local locales = {
     ["Show Help On Tooltips"] = "Mostrar Ajuda na Ferramenta de Dicas",
     ["Show herbs with an appropriate skill level for your character"] = "Mostrar ervas com um nível de habilidade adequado ao seu personagem",
     ["Show herbs with skill range of [min] to [max]"] = "Mostrar ervas com nível de habilidade de [min] a [max]",
-    ["Show Level On Quest Log"] =  "Mostrar Nível no Registro de Missões",
+    ["Show Level On Quest Log"] = "Mostrar Nível no Registro de Missões",
     ["Show Level On Quest Tracker"] = "Mostrar Nível no Rastreador de Missões",
     ["Show map tracker"] = "Mostrar rastreador no mapa",
     ["Show mines with an appropriate skill level for your character"] = "Mostrar minérios com um nível de habilidade adequado ao seu personagem",
@@ -1321,7 +1321,7 @@ local locales = {
     ["Toggle completed quest browser"] = "Activar el navegador de misiones completadas",
     ["Too many entries. Results shown"] = "Demasiada entradas. Resultados mostrados",
     ["Tracked Quests"] = "Misiones rastreadas",
-    ["Translate"] ="Translate",
+    ["Translate"] = "Translate",
     ["Trigger"] = "Disparador",
     ["Type"] = "Tipo",
     ["Unit"] = "Unidad",
@@ -1534,8 +1534,10 @@ local locales = {
   },
 }
 
-pfQuest_Loc = setmetatable(locales[GetLocale()] or {}, { __index = function(tab,key)
- local value = tostring(key)
- rawset(tab,key,value)
- return value
-end})
+pfQuest_Loc = setmetatable(locales[GetLocale()] or {}, {
+  __index = function(tab, key)
+    local value = tostring(key)
+    rawset(tab, key, value)
+    return value
+  end,
+})
