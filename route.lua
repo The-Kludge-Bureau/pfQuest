@@ -187,6 +187,21 @@ local function sortfunc(a,b) return a[4] < b[4] end
 pfQuest.route:SetScript("OnUpdate", function()
   local xplayer, yplayer = GetPlayerMapPosition("player")
   local wrongmap = xplayer == 0 and yplayer == 0 and true or nil
+
+  -- GetCurrentMapZone()==0 means continent or world zoom. GetPlayerMapPosition
+  -- still returns valid coords at these levels (relative to the continent),
+  -- so wrongmap is never true there — we need an explicit check.
+  -- objectivepath dots are drawn at zone-level percentage coords scaled to
+  -- WorldMapButton, so they appear in the wrong place at any other zoom level.
+  local zoomedout = GetCurrentMapZone() == 0 and true or nil
+  if zoomedout then
+    ClearPath(objectivepath)
+    ClearPath(playerpath)
+    ClearPath(mplayerpath)
+    this.firstnode = nil
+    return
+  end
+
   local curpos = xplayer + yplayer
 
   -- limit distance and route updates to once per .1 seconds
