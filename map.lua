@@ -227,6 +227,11 @@ pfMap.tooltipIndex = {}
 -- AddNode/DeleteNode insert here; UpdateNodes reads and clears entries.
 pfMap.dirtyNodes = {}
 
+-- Set of map IDs that have at least one dirty node table.
+-- Keyed by zone map ID (integer). Allows WORLD_MAP_UPDATE to cheaply check
+-- whether the current zone has pending writes without scanning all dirtyNodes.
+pfMap.dirtyMaps = {}
+
 pfMap.minimap_indoor = minimap_indoor
 pfMap.minimap_zoom = minimap_zoom
 pfMap.minimap_sizes = minimap_sizes
@@ -560,6 +565,7 @@ function pfMap:AddNode(meta)
 
   -- mark this coord's node table dirty so UpdateNodes knows to reprocess it
   pfMap.dirtyNodes[pfMap.nodes[addon][map][coords]] = true
+  pfMap.dirtyMaps[map] = true
 
   -- maintain reverse title index for O(1) DeleteNode
   if not pfMap.titleIndex[addon] then pfMap.titleIndex[addon] = {} end
@@ -627,6 +633,7 @@ function pfMap:DeleteNode(addon, title)
     pfMap.titleIndex = {}
     pfMap.tooltipIndex = {}
     pfMap.dirtyNodes = {}
+    pfMap.dirtyMaps = {}
 
   elseif not title then
     -- wipe all nodes for this addon; clean up both reverse indexes
@@ -662,6 +669,7 @@ function pfMap:DeleteNode(addon, title)
             else
               -- coord survives with remaining titles; reprocess on next UpdateNodes
               pfMap.dirtyNodes[pfMap.nodes[addon][map][coords]] = true
+              pfMap.dirtyMaps[map] = true
             end
           end
         end
@@ -1033,6 +1041,7 @@ function pfMap:UpdateNodes()
 
   -- record which zone was rendered so WORLD_MAP_UPDATE can skip no-op opens
   pfMap.lastUpdateZone = map
+  pfMap.dirtyMaps[map] = nil
 end
 
 function pfMap:UpdateMinimap()
@@ -1166,14 +1175,17 @@ pfMap:SetScript("OnEvent", function()
   end
 
   -- update nodes on world map changes: only schedule an UpdateNodes call if
-  -- the zone has changed or nodes have been dirtied since the last call.
-  -- WORLD_MAP_UPDATE fires on every map open (M key); without this guard the
-  -- debounce would trigger a full UpdateNodes on every open even when nothing
-  -- has changed -- pins are children of WorldMapButton and hide/show with it
-  -- automatically, so no work is needed for a same-zone same-state reopen.
+  -- the zone has changed or the current zone has pending dirty nodes.
+  -- Guards against two sources of false positives:
+  -- (1) GetMapID returns nil during map init (GetCurrentMapZone=0); guarded by
+  --     the `newzone and` check so a transient nil never stamps queue_update.
+  -- (2) next(pfMap.dirtyNodes) is almost always non-nil because dirty nodes in
+  --     other zones are never cleared by UpdateNodes (it only iterates the
+  --     current map). dirtyMaps[newzone] is zone-scoped so it's only true when
+  --     the zone being rendered actually has pending writes.
   if event == "WORLD_MAP_UPDATE" then
     local newzone = pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
-    if newzone ~= pfMap.lastUpdateZone or next(pfMap.dirtyNodes) then
+    if newzone and (newzone ~= pfMap.lastUpdateZone or pfMap.dirtyMaps[newzone]) then
       pfMap.queue_update = GetTime()
     end
   end
