@@ -165,7 +165,7 @@ local function ResultButtonClick()
       pfMap:ShowMapID(pfDatabase:GetBestMap(maps))
     else
       local maps = pfDatabase:SearchMobID(this.id, meta)
-      pfMap:UpdateNodes()
+      pfMap.queue_update = GetTime()
       pfMap:ShowMapID(pfDatabase:GetBestMap(maps))
     end
   elseif this.btype == "objects" then
@@ -174,7 +174,7 @@ local function ResultButtonClick()
       pfMap:ShowMapID(pfDatabase:GetBestMap(maps))
     else
       local maps = pfDatabase:SearchObjectID(this.id, meta)
-      pfMap:UpdateNodes()
+      pfMap.queue_update = GetTime()
       pfMap:ShowMapID(pfDatabase:GetBestMap(maps))
     end
   end
@@ -217,7 +217,7 @@ local function ResultButtonClickSpecial()
   elseif this.buttonType == "V" then
     maps = pfDatabase:SearchVendor(param, meta)
   end
-  pfMap:UpdateNodes()
+  pfMap.queue_update = GetTime()
   pfMap:ShowMapID(pfDatabase:GetBestMap(maps))
 end
 
@@ -625,40 +625,6 @@ pfBrowser:SetScript("OnMouseUp",function()
   this:StopMovingOrSizing()
 end)
 
-pfBrowser:SetScript("OnUpdate", function()
-  -- Throttle to 10 updates/sec instead of every frame (60+)
-  this.elapsed = (this.elapsed or 0) + arg1
-  if this.elapsed < 0.1 then return end
-  this.elapsed = 0
-
-  -- Cache GetMouseFocus to avoid multiple calls
-  local focus = GetMouseFocus()
-
-  -- multi-select handling
-  if not this.selectState and IsControlKeyDown() and focus and focus.pfResultButton then
-    for id, frame in pairs(pfBrowser.tabs) do
-      for id, button in pairs(frame.buttons) do
-        if button.name == focus.name then
-          button.tex:SetTexture(.3,1,.8,.4)
-        end
-      end
-    end
-    this.selectState = "active"
-
-  elseif this.selectState and (this.selectState == "clean" or not IsControlKeyDown()) then
-    for id, frame in pairs(pfBrowser.tabs) do
-      for id, button in pairs(frame.buttons) do
-        if compat.mod(button:GetID(),2) == 1 then
-          button.tex:SetTexture(1,1,1,.02)
-        else
-          button.tex:SetTexture(1,1,1,.04)
-        end
-      end
-    end
-    this.selectState = nil
-  end
-end)
-
 pfUI.api.CreateBackdrop(pfBrowser, nil, true, 0.75)
 table.insert(UISpecialFrames, "pfQuestBrowser")
 
@@ -808,30 +774,81 @@ pfBrowser.input:SetScript("OnEditFocusLost", function()
 end)
 
 -- This script updates all the search tabs when the search text changes
+local searchPending = false
+local searchText = ""
 pfBrowser.input:SetScript("OnTextChanged", function()
   local text = this:GetText()
   if (text == pfQuest_Loc["Search"]) then text = "" end
+  searchText = text
+  searchPending = true
+end)
 
-  local custom = string.find(text, "^custom:")
-  text = string.gsub(text, "^custom:", "")
+-- Deferred search runner: fires at most once per 0.5s after the last keystroke.
+-- Scanning the database four times synchronously on every keystroke caused
+-- visible stuttering; this collapses rapid typing into a single search.
+local searchElapsed = 0
+pfBrowser:SetScript("OnUpdate", function()
+  this.elapsed = (this.elapsed or 0) + arg1
+  if this.elapsed < 0.1 then return end
+  this.elapsed = 0
 
-  for _, caption in ipairs({"Units","Objects","Items","Quests"}) do
-    local searchType = strlower(caption)
+  -- run pending search once debounce interval has elapsed
+  if searchPending then
+    searchElapsed = searchElapsed + 0.1
+    if searchElapsed >= 0.5 then
+      searchElapsed = 0
+      searchPending = false
 
-    local data = (strlen(text) >= 3 or custom) and pfDatabase:GetIDByName(text, searchType, true, custom) or pfBrowser_fav[searchType]
+      local text = searchText
+      local custom = string.find(text, "^custom:")
+      text = string.gsub(text, "^custom:", "")
 
-    local i = 0
-    for id, text in pairs(data) do
-      i = i + 1
+      for _, caption in ipairs({"Units","Objects","Items","Quests"}) do
+        local searchType = strlower(caption)
+        local data = (strlen(text) >= 3 or custom) and pfDatabase:GetIDByName(text, searchType, true, custom) or pfBrowser_fav[searchType]
 
-      if i >= search_limit then break end
-      pfBrowser.tabs[searchType].buttons[i] = pfBrowser.tabs[searchType].buttons[i] or ResultButtonCreate(i, searchType)
-      pfBrowser.tabs[searchType].buttons[i].id = id
-      pfBrowser.tabs[searchType].buttons[i].name = text
-      pfBrowser.tabs[searchType].buttons[i]:Reload()
+        local i = 0
+        for id, text in pairs(data) do
+          i = i + 1
+          if i >= search_limit then break end
+          pfBrowser.tabs[searchType].buttons[i] = pfBrowser.tabs[searchType].buttons[i] or ResultButtonCreate(i, searchType)
+          pfBrowser.tabs[searchType].buttons[i].id = id
+          pfBrowser.tabs[searchType].buttons[i].name = text
+          pfBrowser.tabs[searchType].buttons[i]:Reload()
+        end
+
+        RefreshView(i, searchType, caption)
+      end
     end
+  else
+    searchElapsed = 0
+  end
 
-    RefreshView(i, searchType, caption)
+  -- Cache GetMouseFocus to avoid multiple calls
+  local focus = GetMouseFocus()
+
+  -- multi-select handling
+  if not this.selectState and IsControlKeyDown() and focus and focus.pfResultButton then
+    for id, frame in pairs(pfBrowser.tabs) do
+      for id, button in pairs(frame.buttons) do
+        if button.name == focus.name then
+          button.tex:SetTexture(.3,1,.8,.4)
+        end
+      end
+    end
+    this.selectState = "active"
+
+  elseif this.selectState and (this.selectState == "clean" or not IsControlKeyDown()) then
+    for id, frame in pairs(pfBrowser.tabs) do
+      for id, button in pairs(frame.buttons) do
+        if compat.mod(button:GetID(),2) == 1 then
+          button.tex:SetTexture(1,1,1,.02)
+        else
+          button.tex:SetTexture(1,1,1,.04)
+        end
+      end
+    end
+    this.selectState = nil
   end
 end)
 
