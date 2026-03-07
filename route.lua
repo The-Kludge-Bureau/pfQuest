@@ -300,15 +300,33 @@ pfQuest.route:SetScript("OnUpdate", function()
     -- hide player-to-object path
     ClearPath(playerpath)
     ClearPath(mplayerpath)
+    this.lastDrawX = nil
+    this.lastDrawY = nil
   else
-    -- draw player-to-object path
-    ClearPath(playerpath)
-    ClearPath(mplayerpath)
-    DrawLine(playerpath,xplayer*100,yplayer*100,this.coords[1][1],this.coords[1][2],true)
+    -- only redraw player-to-object path when position has changed enough to
+    -- produce a visible difference — DrawLine places one dot-texture per unit
+    -- of distance, so sub-threshold redraws are pure waste.
+    -- also invalidate when the target node changed (firstnode flip).
+    local px, py = xplayer * 100, yplayer * 100
+    local dx = (this.lastDrawX or px+1) - px
+    local dy = (this.lastDrawY or py+1) - py
+    local moved = dx*dx + dy*dy
+    local targetChanged = this.lastDrawNode ~= this.firstnode
 
-    -- also draw minimap path if enabled
-    if pfQuest_config["routeminimap"] == "1" then
-      DrawLine(mplayerpath,xplayer*100,yplayer*100,this.coords[1][1],this.coords[1][2],true,true)
+    if moved > 0.09 or targetChanged then  -- threshold: 0.3 map units squared
+      this.lastDrawX = px
+      this.lastDrawY = py
+      this.lastDrawNode = this.firstnode
+
+      -- draw player-to-object path
+      ClearPath(playerpath)
+      ClearPath(mplayerpath)
+      DrawLine(playerpath, px, py, this.coords[1][1], this.coords[1][2], true)
+
+      -- also draw minimap path if enabled
+      if pfQuest_config["routeminimap"] == "1" then
+        DrawLine(mplayerpath, px, py, this.coords[1][1], this.coords[1][2], true, true)
+      end
     end
   end
 
