@@ -961,6 +961,10 @@ function pfMap:UpdateNodes()
   -- refresh all nodes
   local t_nodes = GetTime()
   local n_pins, n_skipped = 0, 0
+  -- hoist map dimensions: same for every pin this call, and if the map
+  -- is resized between calls the new values will invalidate cached px/py.
+  local mapW = WorldMapButton:GetWidth()
+  local mapH = WorldMapButton:GetHeight()
   for addon, _ in pairs(pfMap.nodes) do
     if pfMap.nodes[addon][map] then
       for coords, node in pairs(pfMap.nodes[addon][map]) do
@@ -1011,11 +1015,17 @@ function pfMap:UpdateNodes()
             pfQuest.tracker.ButtonAdd(title, node)
           end
 
-          x = x / 100 * WorldMapButton:GetWidth()
-          y = y / 100 * WorldMapButton:GetHeight()
+          local px = x / 100 * mapW
+          local py = y / 100 * mapH
 
-          pfMap.pins[i]:ClearAllPoints()
-          pfMap.pins[i]:SetPoint("CENTER", WorldMapButton, "TOPLEFT", x, -y)
+          -- skip layout calls when the pin hasn't moved; ClearAllPoints +
+          -- SetPoint are the dominant cost in UpdateNodes for large pin counts
+          if pfMap.pins[i].lastX ~= px or pfMap.pins[i].lastY ~= py then
+            pfMap.pins[i].lastX = px
+            pfMap.pins[i].lastY = py
+            pfMap.pins[i]:ClearAllPoints()
+            pfMap.pins[i]:SetPoint("CENTER", WorldMapButton, "TOPLEFT", px, -py)
+          end
 
           pfMap.pins[i]:Show()
         end
@@ -1029,7 +1039,11 @@ function pfMap:UpdateNodes()
 
   -- hide remaining pins
   for j=i, table.getn(pfMap.pins) do
-    if pfMap.pins[j] then pfMap.pins[j]:Hide() end
+    if pfMap.pins[j] then
+      pfMap.pins[j]:Hide()
+      pfMap.pins[j].lastX = nil
+      pfMap.pins[j].lastY = nil
+    end
   end
 
   -- Perform tracker layout once after all ButtonAdd calls complete
