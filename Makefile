@@ -19,7 +19,7 @@ full:
 
 	# remove tbc data
 	find release/$@/pfQuest -name "*-tbc*" -exec rm {} \;
-	( cd release/$@; zip -qr ../pfQuest-$@.zip pfQuest )
+	( cd release/$@; zip -9qr ../pfQuest-$@.zip pfQuest )
 
 full-tbc:
 	$(eval LOCALE := $(shell echo $@))
@@ -29,7 +29,7 @@ full-tbc:
 
 	# generate new toc file
 	echo $(GITREV) > release/$@/pfQuest-tbc/gitrev.txt
-	( cd release/$@; zip -qr ../pfQuest-$@.zip pfQuest-tbc )
+	( cd release/$@; zip -9qr ../pfQuest-$@.zip pfQuest-tbc )
 
 full-wotlk:
 	$(eval LOCALE := $(shell echo $@))
@@ -39,7 +39,7 @@ full-wotlk:
 
 	# generate new toc file
 	echo $(GITREV) > release/$@/pfQuest-wotlk/gitrev.txt
-	( cd release/$@; zip -qr ../pfQuest-$@.zip pfQuest-wotlk )
+	( cd release/$@; zip -9qr ../pfQuest-$@.zip pfQuest-wotlk )
 
 enUS koKR frFR deDE zhCN esES ruRU ptBR:
 	$(eval LOCALE := $(shell echo $@))
@@ -63,7 +63,7 @@ enUS koKR frFR deDE zhCN esES ruRU ptBR:
 	/bin/echo 'init\addon.xml' >> release/$@/pfQuest/pfQuest.toc
 
 	echo $(GITREV) > release/$@/pfQuest/gitrev.txt
-	( cd release/$@; zip -qr ../pfQuest-$@.zip pfQuest )
+	( cd release/$@; zip -9qr ../pfQuest-$@.zip pfQuest )
 
 enUS-tbc koKR-tbc frFR-tbc deDE-tbc zhCN-tbc esES-tbc ruRU-tbc:
 	$(eval LOCALE := $(shell echo $@ | sed 's/-tbc//g'))
@@ -90,7 +90,7 @@ enUS-tbc koKR-tbc frFR-tbc deDE-tbc zhCN-tbc esES-tbc ruRU-tbc:
 	/bin/echo 'init\addon.xml' >> release/$@/pfQuest-tbc/pfQuest-tbc.toc
 
 	echo $(GITREV) > release/$@/pfQuest-tbc/gitrev.txt
-	( cd release/$@; zip -qr ../pfQuest-$@.zip pfQuest-tbc )
+	( cd release/$@; zip -9qr ../pfQuest-$@.zip pfQuest-tbc )
 
 enUS-wotlk koKR-wotlk frFR-wotlk deDE-wotlk zhCN-wotlk esES-wotlk ruRU-wotlk:
 	$(eval LOCALE := $(shell echo $@ | sed 's/-wotlk//g'))
@@ -117,7 +117,7 @@ enUS-wotlk koKR-wotlk frFR-wotlk deDE-wotlk zhCN-wotlk esES-wotlk ruRU-wotlk:
 	/bin/echo 'init\addon.xml' >> release/$@/pfQuest-wotlk/pfQuest-wotlk.toc
 
 	echo $(GITREV) > release/$@/pfQuest-wotlk/gitrev.txt
-	( cd release/$@; zip -qr ../pfQuest-$@.zip pfQuest-wotlk )
+	( cd release/$@; zip -9qr ../pfQuest-$@.zip pfQuest-wotlk )
 
 database:
 	$(MAKE) -C toolbox/ all
