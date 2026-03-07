@@ -198,8 +198,6 @@ pfQuest.route:SetScript("OnUpdate", function()
   -- save current position
   lastpos = curpos
 
-  local _t0 = GetTime()
-
   -- update distances to player
   for id, data in pairs(this.coords) do
     if data[1] and data[2] then
@@ -207,12 +205,8 @@ pfQuest.route:SetScript("OnUpdate", function()
       this.coords[id][4] = ceil(math.sqrt(x*x+y*y)*100)/100
     end
   end
-  local _t1 = GetTime()
-
   -- sort all coords by distance only once per second
-  local _sorted = false
   if not this.recalculate or this.recalculate < GetTime() then
-    _sorted = true
     table.sort(this.coords, sortfunc)
 
     -- order list on custom targets
@@ -244,7 +238,6 @@ pfQuest.route:SetScript("OnUpdate", function()
 
     this.recalculate = GetTime() + 1
   end
-  local _t2 = GetTime()
 
   -- show arrow when route exists and is stable
   if not wrongmap and this.coords[1] and this.coords[1][4] and not this.arrow:IsShown() and pfQuest_config["arrow"] == "1" and GetTime() > completed + 1 then
@@ -256,8 +249,6 @@ pfQuest.route:SetScript("OnUpdate", function()
     ClearPath(objectivepath)
     ClearPath(playerpath)
     ClearPath(mplayerpath)
-    pfQuest:Debug(format("|cffffff00TIMER route.OnUpdate coords=%d dist=%.4fs sort=%s(%.4fs) path=skipped",
-      table.getn(this.coords), _t1-_t0, tostring(_sorted), _t2-_t1))
     return
   end
 
@@ -329,10 +320,6 @@ pfQuest.route:SetScript("OnUpdate", function()
       end
     end
   end
-
-  local _t3 = GetTime()
-  pfQuest:Debug(format("|cffffff00TIMER route.OnUpdate coords=%d dist=%.4fs sort=%s(%.4fs) path=%.4fs total=%.4fs",
-    table.getn(this.coords), _t1-_t0, tostring(_sorted), _t2-_t1, _t3-_t2, _t3-_t0))
 end)
 
 pfQuest.route.drawlayer = CreateFrame("Frame", "pfQuestRouteDrawLayer", WorldMapButton)

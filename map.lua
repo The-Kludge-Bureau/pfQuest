@@ -951,15 +951,12 @@ function pfMap:UpdateNodes()
   local i = 1
 
   -- reset tracker
-  local t_reset = GetTime()
   pfQuest.tracker.Reset()
-  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes tracker.Reset=%.4fs", GetTime() - t_reset))
 
   -- reset route
   pfQuest.route:Reset()
 
   -- refresh all nodes
-  local t_nodes = GetTime()
   local n_pins, n_skipped = 0, 0
   -- hoist map dimensions: same for every pin this call, and if the map
   -- is resized between calls the new values will invalidate cached px/py.
@@ -1035,7 +1032,7 @@ function pfMap:UpdateNodes()
       end
     end
   end
-  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes pins=%d skipped=%d loop=%.4fs", n_pins, n_skipped, GetTime() - t_nodes))
+  pfQuest:Debug(format("UpdateNodes pins=%d skipped=%d", n_pins, n_skipped))
 
   -- hide remaining pins
   for j=i, table.getn(pfMap.pins) do
@@ -1047,11 +1044,9 @@ function pfMap:UpdateNodes()
   end
 
   -- Perform tracker layout once after all ButtonAdd calls complete
-  local t_layout = GetTime()
   if pfQuest.tracker and pfQuest.tracker.DoLayout then
     pfQuest.tracker.DoLayout()
   end
-  pfQuest:Debug(format("|cffffff00TIMER UpdateNodes DoLayout=%.4fs", GetTime() - t_layout))
 
   -- record which zone was rendered so WORLD_MAP_UPDATE can skip no-op opens
   pfMap.lastUpdateZone = map
@@ -1106,7 +1101,6 @@ function pfMap:UpdateMinimap()
   local yDraw = pfMap.drawlayer:GetHeight() / yScale / 100
 
   local i = 1
-  local _t_mini = GetTime()
 
   -- refresh all nodes
   for addon, data in pairs(pfMap.nodes) do
@@ -1179,8 +1173,6 @@ function pfMap:UpdateMinimap()
   for j=i, table.getn(pfMap.mpins) do
     if pfMap.mpins[j] then pfMap.mpins[j]:Hide() end
   end
-
-  pfQuest:Debug(format("|cffffff00TIMER UpdateMinimap pins=%d loop=%.4fs", i-1, GetTime() - _t_mini))
 end
 
 local zone
