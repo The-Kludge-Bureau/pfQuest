@@ -8,7 +8,7 @@ The goal is to provide an accurate in-game equivalent of [AoWoW](http://db.vanil
 
 pfQuest is the successor of [ShaguQuest](https://shagu.org/ShaguQuest/), written from scratch with no dependency on any specific map or questlog addon. It is designed to work alongside the default UI and any other addon. If you run into a conflict, please open an issue on the bugtracker.
 
-You can check the [Latest Changes](https://github.com/The-Kludge-Bureau/pfQuest/commits/master) page to see what has changed recently.
+You can check the [Latest Changes](https://github.com/The-Kludge-Bureau/pfQuest/commits/main) page to see what has changed recently.
 
 ## Before You Install
 
@@ -57,7 +57,7 @@ Slim packages (single language): [English](https://github.com/The-Kludge-Bureau/
 The development version includes databases for all languages and all client expansions in a single folder. It will work in both Vanilla and TBC mode depending on the folder name. Due to the amount of included data, expect higher RAM and disk usage and slightly longer load times compared to the release packages.
 
 - Clone via Git: [`https://github.com/The-Kludge-Bureau/pfQuest.git`](https://github.com/The-Kludge-Bureau/pfQuest.git)
-- Download as zip: **[master.zip](https://github.com/The-Kludge-Bureau/pfQuest/archive/master.zip)**
+- Download as zip: **[main.zip](https://github.com/The-Kludge-Bureau/pfQuest/archive/main.zip)**
 
 ## Controls
 
