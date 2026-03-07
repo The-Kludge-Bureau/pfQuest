@@ -38,13 +38,18 @@ function pfQuest:Debug(msg)
     pfQuest.debugwin:SetWidth(320)
     pfQuest.debugwin:SetHeight(320)
     pfQuest.debugwin:SetPoint("RIGHT", -42, 0)
-    pfQuest.debugwin:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")
+    local font = pfUI and pfUI.font_default or STANDARD_TEXT_FONT
+    local size = tonumber(pfQuest_config["trackerfontsize"]) or 12
+    pfQuest.debugwin:SetFont(font, size, "OUTLINE")
     pfQuest.debugwin:SetFading(false)
     pfQuest.debugwin:SetMaxLines(150)
     pfQuest.debugwin:SetJustifyH("RIGHT")
     pfQuest.debugwin:SetJustifyV("CENTER")
   end
 
+  local font = pfUI and pfUI.font_default or STANDARD_TEXT_FONT
+  local size = tonumber(pfQuest_config["trackerfontsize"]) or 12
+  pfQuest.debugwin:SetFont(font, size, "OUTLINE")
   pfQuest.debugwin:AddMessage(msg)
   pfQuest.debugwin:Show()
 end
