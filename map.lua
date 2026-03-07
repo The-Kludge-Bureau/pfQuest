@@ -1106,6 +1106,7 @@ function pfMap:UpdateMinimap()
   local yDraw = pfMap.drawlayer:GetHeight() / yScale / 100
 
   local i = 1
+  local _t_mini = GetTime()
 
   -- refresh all nodes
   for addon, data in pairs(pfMap.nodes) do
@@ -1172,6 +1173,8 @@ function pfMap:UpdateMinimap()
   for j=i, table.getn(pfMap.mpins) do
     if pfMap.mpins[j] then pfMap.mpins[j]:Hide() end
   end
+
+  pfQuest:Debug(format("|cffffff00TIMER UpdateMinimap pins=%d loop=%.4fs", i-1, GetTime() - _t_mini))
 end
 
 local zone

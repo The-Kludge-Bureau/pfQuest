@@ -98,6 +98,8 @@ tracker:SetScript("OnMouseUp",function()
 end)
 
 tracker:SetScript("OnUpdate", function()
+  local _t0 = GetTime()
+
   if WorldMapFrame:IsShown() then
     if this.strata ~= "FULLSCREEN_DIALOG" then
       this:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -119,6 +121,14 @@ tracker:SetScript("OnUpdate", function()
 
   if pfQuestCompat.QuestWatchFrame:IsShown() then
     pfQuestCompat.QuestWatchFrame:Hide()
+  end
+
+  -- sample cost once per second to avoid chat spam
+  this._samples = (this._samples or 0) + 1
+  this._total = (this._total or 0) + (GetTime() - _t0)
+  if (this._tick or 0) < GetTime() then
+    pfQuest:Debug(format("|cffffff00TIMER tracker.OnUpdate avg=%.6fs over %d frames", this._total / this._samples, this._samples))
+    this._samples, this._total, this._tick = 0, 0, GetTime() + 1
   end
 end)
 

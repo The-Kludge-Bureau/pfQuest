@@ -187,21 +187,6 @@ local function sortfunc(a,b) return a[4] < b[4] end
 pfQuest.route:SetScript("OnUpdate", function()
   local xplayer, yplayer = GetPlayerMapPosition("player")
   local wrongmap = xplayer == 0 and yplayer == 0 and true or nil
-
-  -- GetCurrentMapZone()==0 means continent or world zoom. GetPlayerMapPosition
-  -- still returns valid coords at these levels (relative to the continent),
-  -- so wrongmap is never true there — we need an explicit check.
-  -- objectivepath dots are drawn at zone-level percentage coords scaled to
-  -- WorldMapButton, so they appear in the wrong place at any other zoom level.
-  local zoomedout = GetCurrentMapZone() == 0 and true or nil
-  if zoomedout then
-    ClearPath(objectivepath)
-    ClearPath(playerpath)
-    ClearPath(mplayerpath)
-    this.firstnode = nil
-    return
-  end
-
   local curpos = xplayer + yplayer
 
   -- limit distance and route updates to once per .1 seconds
@@ -213,6 +198,8 @@ pfQuest.route:SetScript("OnUpdate", function()
   -- save current position
   lastpos = curpos
 
+  local _t0 = GetTime()
+
   -- update distances to player
   for id, data in pairs(this.coords) do
     if data[1] and data[2] then
@@ -220,9 +207,12 @@ pfQuest.route:SetScript("OnUpdate", function()
       this.coords[id][4] = ceil(math.sqrt(x*x+y*y)*100)/100
     end
   end
+  local _t1 = GetTime()
 
   -- sort all coords by distance only once per second
+  local _sorted = false
   if not this.recalculate or this.recalculate < GetTime() then
+    _sorted = true
     table.sort(this.coords, sortfunc)
 
     -- order list on custom targets
@@ -254,6 +244,7 @@ pfQuest.route:SetScript("OnUpdate", function()
 
     this.recalculate = GetTime() + 1
   end
+  local _t2 = GetTime()
 
   -- show arrow when route exists and is stable
   if not wrongmap and this.coords[1] and this.coords[1][4] and not this.arrow:IsShown() and pfQuest_config["arrow"] == "1" and GetTime() > completed + 1 then
@@ -265,6 +256,8 @@ pfQuest.route:SetScript("OnUpdate", function()
     ClearPath(objectivepath)
     ClearPath(playerpath)
     ClearPath(mplayerpath)
+    pfQuest:Debug(format("|cffffff00TIMER route.OnUpdate coords=%d dist=%.4fs sort=%s(%.4fs) path=skipped",
+      table.getn(this.coords), _t1-_t0, tostring(_sorted), _t2-_t1))
     return
   end
 
@@ -304,14 +297,9 @@ pfQuest.route:SetScript("OnUpdate", function()
   end
 
   if wrongmap then
-    -- hide all paths and reset firstnode so objectivepath is redrawn
-    -- when the user returns to zone view. Without this, objectivepath
-    -- stays visible at continent/world zoom (drawn at zone coordinates)
-    -- and doesn't redraw on return because firstnode appears unchanged.
-    ClearPath(objectivepath)
+    -- hide player-to-object path
     ClearPath(playerpath)
     ClearPath(mplayerpath)
-    this.firstnode = nil
   else
     -- draw player-to-object path
     ClearPath(playerpath)
@@ -323,6 +311,10 @@ pfQuest.route:SetScript("OnUpdate", function()
       DrawLine(mplayerpath,xplayer*100,yplayer*100,this.coords[1][1],this.coords[1][2],true,true)
     end
   end
+
+  local _t3 = GetTime()
+  pfQuest:Debug(format("|cffffff00TIMER route.OnUpdate coords=%d dist=%.4fs sort=%s(%.4fs) path=%.4fs total=%.4fs",
+    table.getn(this.coords), _t1-_t0, tostring(_sorted), _t2-_t1, _t3-_t2, _t3-_t0))
 end)
 
 pfQuest.route.drawlayer = CreateFrame("Frame", "pfQuestRouteDrawLayer", WorldMapButton)
