@@ -202,7 +202,7 @@ pfQuest.route:SetScript("OnUpdate", function()
   lastpos = curpos
 
   -- update distances to player
-  for id, data in pairs(this.coords) do
+  for id, data in ipairs(this.coords) do
     if data[1] and data[2] then
       local x, y = (xplayer*100 - data[1])*1.5, yplayer*100 - data[2]
       this.coords[id][4] = ceil(math.sqrt(x*x+y*y)*100)/100
@@ -217,7 +217,7 @@ pfQuest.route:SetScript("OnUpdate", function()
       local target = nil
 
       -- check for the old index of the target
-      for id, data in pairs(this.coords) do
+      for id, data in ipairs(this.coords) do
         if pfQuest.route.IsTarget(data[3]) then
           target = id
           break
@@ -229,7 +229,7 @@ pfQuest.route:SetScript("OnUpdate", function()
         local tmp = {}
         table.insert(tmp, this.coords[target])
 
-        for id, data in pairs(this.coords) do
+        for id, data in ipairs(this.coords) do
           if id ~= target then
             table.insert(tmp, this.coords[id])
           end
@@ -269,7 +269,7 @@ pfQuest.route:SetScript("OnUpdate", function()
 
       -- remove other item requirement gameobjects of same type from route
       if route[i] and route[i][3] and route[i][3].itemreq then
-        for id, data in pairs(this.coords) do
+        for id, data in ipairs(this.coords) do
           if not blacklist[id] and data[1] and data[2] and data[3]
             and data[3].itemreq and data[3].itemreq == route[i][3].itemreq
           then
@@ -351,7 +351,7 @@ pfQuest.route.arrow:SetScript("OnDragStop", function()
 end)
 
 local invalid, lasttarget
-local xplayer, yplayer, wrongmap, wrongmap
+local xplayer, yplayer, wrongmap
 local xDelta, yDelta, dir, angle
 local player, perc, column, row, xstart, ystart, xend, yend
 local area, alpha, texalpha, color
