@@ -37,17 +37,22 @@ compatnamefake:SetScript("OnEvent", function()
 end)
 
 -- checking for control key is very time expensive in 1.12
--- this loop puts it into one place and only updates it every .2 seconds
--- it also only updates the key if the mouse is over a relevant frame
+-- Poll IsControlKeyDown() frequently enough that Ctrl feels responsive.
+-- Always clear when the map is not shown to avoid sticky state from a
+-- previous session (e.g. Ctrl released while mouse was off the map).
 local controlkey = CreateFrame("Frame", "pfQuestControlKey", UIParent)
 controlkey:SetScript("OnUpdate", function()
-  if (this.throttle or 0.2) > GetTime() then
+  if (this.throttle or 0.05) > GetTime() then
     return
   else
-    this.throttle = GetTime() + 0.2
+    this.throttle = GetTime() + 0.05
   end
-  if WorldMapFrame:IsShown() and MouseIsOver(WorldMapFrame) or MouseIsOver(pfMap.drawlayer) then
+  if WorldMapFrame:IsShown() and MouseIsOver(WorldMapFrame) then
     controlkey.pressed = IsControlKeyDown()
+  elseif MouseIsOver(pfMap.drawlayer) then
+    controlkey.pressed = IsControlKeyDown()
+  else
+    controlkey.pressed = nil
   end
 end)
 
