@@ -1081,6 +1081,7 @@ function pfMap:UpdateNodes()
 
   local color = pfQuest_config["spawncolors"] == "1" and "spawn" or "title"
   local map = pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
+  if not map then return end
   local i = 1
 
   -- reset tracker
