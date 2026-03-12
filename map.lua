@@ -1347,18 +1347,27 @@ pfMap:SetScript("OnEvent", function()
     local newzone = pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
 
     if newzone == nil then
-      -- continent view: hide all worldmap pins immediately
+      -- continent view: hide all worldmap pins and route lines immediately
       for j = 1, table.getn(pfMap.pins) do
         if pfMap.pins[j] then
           pfMap.pins[j]:Hide()
         end
       end
+      if pfQuest and pfQuest.route and pfQuest.route.drawlayer then
+        pfQuest.route.drawlayer:Hide()
+      end
       pfMap.lastUpdateZone = nil
     elseif pfMap.mapJustOpened then
-      -- map just opened: debounce the burst, clear flag once settled
+      -- map just opened on a zone: ensure route layer is visible and debounce
+      if pfQuest and pfQuest.route and pfQuest.route.drawlayer then
+        pfQuest.route.drawlayer:Show()
+      end
       pfMap.queue_update = GetTime()
     elseif newzone ~= pfMap.lastUpdateZone then
       -- deliberate zone change: update immediately, no debounce
+      if pfQuest and pfQuest.route and pfQuest.route.drawlayer then
+        pfQuest.route.drawlayer:Show()
+      end
       pfMap.queue_update = nil
       pfMap:UpdateNodes()
     elseif pfMap.dirtyMaps[newzone] then
