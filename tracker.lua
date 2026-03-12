@@ -689,19 +689,32 @@ function tracker.Reset()
   local _, numQuests = GetNumQuestLogEntries()
   local found = 0
 
-  -- iterate over all quests
-  for qlogid = 1, 40 do
-    local title, level, tag, header, collapsed, complete = compat.GetQuestLogTitle(qlogid)
-    if title and not header then
-      local watched = IsQuestWatched(qlogid)
-      if watched then
-        local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
-        pfQuest.tracker.ButtonAdd(title, { dummy = true, addon = "PFQUEST", texture = img })
-      end
+  if pfQuest_config["trackingmethod"] == 1 then
+    -- In "All Quests" mode, add a dummy button for every active quest so it
+    -- appears in the tracker immediately on acceptance, even when objectives
+    -- are in a different zone and no map pins exist for the current map.
+    -- Use pfQuest.questlog (keyed by numeric questid for DB quests, title for
+    -- unknowns) so ButtonAdd can resolve the quest from pfQuest.questlog.
+    for questid, data in pairs(pfQuest.questlog) do
+      local _, _, _, _, _, complete = compat.GetQuestLogTitle(data.qlogid)
+      local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
+      pfQuest.tracker.ButtonAdd(data.title, { dummy = true, addon = "PFQUEST", texture = img, questid = questid })
+    end
+  else
+    -- In other modes, only add dummy buttons for watched quests.
+    for qlogid = 1, 40 do
+      local title, level, tag, header, collapsed, complete = compat.GetQuestLogTitle(qlogid)
+      if title and not header then
+        local watched = IsQuestWatched(qlogid)
+        if watched then
+          local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
+          pfQuest.tracker.ButtonAdd(title, { dummy = true, addon = "PFQUEST", texture = img })
+        end
 
-      found = found + 1
-      if found >= numQuests then
-        break
+        found = found + 1
+        if found >= numQuests then
+          break
+        end
       end
     end
   end
