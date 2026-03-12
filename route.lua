@@ -289,6 +289,20 @@ pfQuest.route:SetScript("OnUpdate", function()
     return
   end
 
+  -- continent or two-continent view: hide all paths and skip route calculation.
+  -- wrongmap means GetPlayerMapPosition returned 0,0 so distances are meaningless;
+  -- without this guard the re-sort from bad distances flips firstnode and causes
+  -- the route to be redrawn on the continent map.
+  if wrongmap then
+    ClearPath(objectivepath)
+    ClearPath(playerpath)
+    ClearPath(mplayerpath)
+    this.lastDrawX = nil
+    this.lastDrawY = nil
+    this.firstnode = nil
+    return
+  end
+
   -- check first node for changes
   if this.firstnode ~= tostring(this.coords[1][1] .. this.coords[1][2]) then
     this.firstnode = tostring(this.coords[1][1] .. this.coords[1][2])
@@ -329,37 +343,29 @@ pfQuest.route:SetScript("OnUpdate", function()
     completed = GetTime()
   end
 
-  if wrongmap then
-    -- hide player-to-object path
+  -- only redraw player-to-object path when position has changed enough to
+  -- produce a visible difference — DrawLine places one dot-texture per unit
+  -- of distance, so sub-threshold redraws are pure waste.
+  -- also invalidate when the target node changed (firstnode flip).
+  local px, py = xplayer * 100, yplayer * 100
+  local dx = (this.lastDrawX or px + 1) - px
+  local dy = (this.lastDrawY or py + 1) - py
+  local moved = dx * dx + dy * dy
+  local targetChanged = this.lastDrawNode ~= this.firstnode
+
+  if moved > 0.09 or targetChanged then -- threshold: 0.3 map units squared
+    this.lastDrawX = px
+    this.lastDrawY = py
+    this.lastDrawNode = this.firstnode
+
+    -- draw player-to-object path
     ClearPath(playerpath)
     ClearPath(mplayerpath)
-    this.lastDrawX = nil
-    this.lastDrawY = nil
-  else
-    -- only redraw player-to-object path when position has changed enough to
-    -- produce a visible difference — DrawLine places one dot-texture per unit
-    -- of distance, so sub-threshold redraws are pure waste.
-    -- also invalidate when the target node changed (firstnode flip).
-    local px, py = xplayer * 100, yplayer * 100
-    local dx = (this.lastDrawX or px + 1) - px
-    local dy = (this.lastDrawY or py + 1) - py
-    local moved = dx * dx + dy * dy
-    local targetChanged = this.lastDrawNode ~= this.firstnode
+    DrawLine(playerpath, px, py, this.coords[1][1], this.coords[1][2], true)
 
-    if moved > 0.09 or targetChanged then -- threshold: 0.3 map units squared
-      this.lastDrawX = px
-      this.lastDrawY = py
-      this.lastDrawNode = this.firstnode
-
-      -- draw player-to-object path
-      ClearPath(playerpath)
-      ClearPath(mplayerpath)
-      DrawLine(playerpath, px, py, this.coords[1][1], this.coords[1][2], true)
-
-      -- also draw minimap path if enabled
-      if pfQuest_config["routeminimap"] == "1" then
-        DrawLine(mplayerpath, px, py, this.coords[1][1], this.coords[1][2], true, true)
-      end
+    -- also draw minimap path if enabled
+    if pfQuest_config["routeminimap"] == "1" then
+      DrawLine(mplayerpath, px, py, this.coords[1][1], this.coords[1][2], true, true)
     end
   end
 end)
