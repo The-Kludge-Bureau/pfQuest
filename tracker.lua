@@ -602,6 +602,7 @@ function tracker.ButtonAdd(title, node)
     elseif node.cluster and (not button.node or button.node.texture) then
       id = existing -- cluster icon, acceptable
     else
+      button.inLocalZone = true
       return -- no icon update needed
     end
   end
