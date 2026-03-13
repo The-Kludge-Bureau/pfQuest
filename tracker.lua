@@ -676,6 +676,7 @@ function tracker.Reset()
     button.level = nil
     button.title = nil
     button.perc = nil
+    button.inLocalZone = nil
     button.empty = true
     button:SetHeight(0)
     button:Hide()
