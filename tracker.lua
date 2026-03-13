@@ -326,6 +326,8 @@ local function trackersort(a, b)
     return false
   elseif (a.tracked and 1 or -1) ~= (b.tracked and 1 or -1) then
     return (a.tracked and 1 or -1) > (b.tracked and 1 or -1)
+  elseif (a.inLocalZone and 1 or -1) ~= (b.inLocalZone and 1 or -1) then
+    return (a.inLocalZone and 1 or -1) > (b.inLocalZone and 1 or -1)
   elseif (a.level or -1) ~= (b.level or -1) then
     return (a.level or -1) > (b.level or -1)
   elseif (a.perc or -1) ~= (b.perc or -1) then
