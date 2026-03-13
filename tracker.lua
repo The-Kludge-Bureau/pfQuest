@@ -125,6 +125,10 @@ tracker:SetScript("OnUpdate", function()
   if pfQuestCompat.QuestWatchFrame:IsShown() then
     pfQuestCompat.QuestWatchFrame:Hide()
   end
+
+  if tracker.needsSort then
+    tracker.DoLayout()
+  end
 end)
 
 tracker:SetScript("OnShow", function()
