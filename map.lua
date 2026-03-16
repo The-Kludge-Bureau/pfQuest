@@ -845,7 +845,18 @@ function pfMap:NodeClick()
   else
     -- switch color
     pfQuest_colors[this.color] = { str2rgb(this.color .. GetTime()) }
-    pfMap.dirtyNodes[this.node] = true
+    -- dirty every coord table containing this title so all related pins re-render
+    local addon = this.node and this.node[this.title] and this.node[this.title].addon
+    if addon and pfMap.titleIndex[addon] and pfMap.titleIndex[addon][this.title] then
+      for mapId, coords in pairs(pfMap.titleIndex[addon][this.title]) do
+        for coord in pairs(coords) do
+          local nt = pfMap.nodes[addon][mapId] and pfMap.nodes[addon][mapId][coord]
+          if nt then pfMap.dirtyNodes[nt] = true end
+        end
+      end
+    else
+      pfMap.dirtyNodes[this.node] = true
+    end
     pfMap.queue_update = GetTime()
   end
 end
