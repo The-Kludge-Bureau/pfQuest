@@ -261,6 +261,9 @@ pfQuest:SetScript("OnUpdate", function()
     pfQuest.queue[id] = nil
     pfQuest.queueCount = pfQuest.queueCount - 1
 
+    -- Force map update so tracker refreshes (even for quests with no objectives)
+    pfMap.queue_update = GetTime()
+
     -- only return when other entries exist
     -- otherwise, continue and update questgivers
     if pfQuest.queueCount > 0 then

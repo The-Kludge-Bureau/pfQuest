@@ -840,10 +840,12 @@ function pfMap:NodeClick()
   then
     -- set as arrow target priority
     pfQuest.route.SetTarget((not pfQuest.route.IsTarget(this) and this))
+    pfMap.dirtyNodes[this.node] = true
     pfMap.queue_update = GetTime()
   else
     -- switch color
     pfQuest_colors[this.color] = { str2rgb(this.color .. GetTime()) }
+    pfMap.dirtyNodes[this.node] = true
     pfMap.queue_update = GetTime()
   end
 end
