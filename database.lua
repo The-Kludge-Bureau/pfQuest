@@ -1868,10 +1868,12 @@ function pfDatabase:SearchQuests(meta, maps)
   end
 
   -- Phase 2: remove nodes for quests that left the passing set.
+  -- Skip quests that are now active: their nodes were just refreshed by
+  -- SearchQuestID during queue processing and must not be wiped here.
   local t_rm0 = GetTime()
   local removed = 0
   for id in pairs(self.lastQuestGiversSet) do
-    if not currentSet[id] then
+    if not currentSet[id] and not (pfQuest and pfQuest.questlog and pfQuest.questlog[id]) then
       local title = (pfDB.quests.loc[id] and pfDB.quests.loc[id].T) or UNKNOWN
       pfMap:DeleteNode("PFQUEST", title)
       removed = removed + 1
