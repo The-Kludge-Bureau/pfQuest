@@ -1302,9 +1302,12 @@ function pfMap:UpdateMinimap()
           -- skip expensive UpdateNode work (highlightdb rebuild, node iteration,
           -- size calls) when this pin is already showing the correct node and
           -- nothing has been added or removed from it since the last render.
+          -- dirtyNodes is intentionally NOT cleared here: UpdateNodes (world map)
+          -- relies on that flag and would skip the re-render if we cleared it now.
+          -- The minimap's own cache guard (mpins[i].node ~= node) handles staleness
+          -- independently, so dirtyNodes cleanup is left to UpdateNodes.
           if pfMap.mpins[i].node ~= node or pfMap.dirtyNodes[node] then
             pfMap:UpdateNode(pfMap.mpins[i], node, color, "minimap", distance)
-            pfMap.dirtyNodes[node] = nil
           end
 
           pfMap.mpins[i].hl:Hide()
