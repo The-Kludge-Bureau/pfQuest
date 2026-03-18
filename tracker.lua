@@ -392,13 +392,19 @@ function tracker.ButtonEvent(self)
   end
 
   if tracker.mode == "QUEST_TRACKING" then
-    local qlogid = pfQuest.questlog[qid] and pfQuest.questlog[qid].qlogid or 0
-    local qtitle, level, tag, header, collapsed, complete = compat.GetQuestLogTitle(qlogid)
-    if not qlogid or not qtitle then
+    if pfQuest.questlog[qid] and pfQuest.questlog[qid].collapsed then
+      self:SetHeight(0)
       return
     end
-    local objectives = GetNumQuestLeaderBoards(qlogid)
-    local watched = IsQuestWatched(qlogid)
+    local qlogid = pfQuest.questlog[qid] and pfQuest.questlog[qid].qlogid or 0
+    local qtitle, level, tag, header, collapsed, complete = compat.GetQuestLogTitle(qlogid)
+    -- If qlogid is stale (quest shifted due to collapse/expand), suppress
+    -- objectives to avoid briefly showing wrong data from the wrong slot.
+    -- UpdateQuestlog will fix the qlogid shortly via RELOAD_QLOGID.
+    local stale = qtitle ~= title
+    if stale then complete = nil end
+    local objectives = stale and 0 or GetNumQuestLeaderBoards(qlogid)
+    local watched = stale and nil or IsQuestWatched(qlogid)
     local color = pfQuestCompat.GetDifficultyColor(level)
     local cur, max = 0, 0
     local percent = 0
@@ -579,6 +585,9 @@ function tracker.ButtonAdd(title, node)
     if not pfQuest.questlog or not pfQuest.questlog[questid] then
       return
     end
+    if pfQuest.questlog[questid].collapsed then
+      return
+    end
   elseif tracker.mode == "GIVER_TRACKING" then -- skip everything that isn't a questgiver
     if node.addon ~= "PFQUEST" then
       return
@@ -704,19 +713,27 @@ function tracker.Reset()
     -- Use pfQuest.questlog (keyed by numeric questid for DB quests, title for
     -- unknowns) so ButtonAdd can resolve the quest from pfQuest.questlog.
     for questid, data in pairs(pfQuest.questlog) do
-      local _, _, _, _, _, complete = compat.GetQuestLogTitle(data.qlogid)
-      local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
-      pfQuest.tracker.ButtonAdd(data.title, { dummy = true, addon = "PFQUEST", texture = img, questid = questid })
+      if not data.collapsed then
+        local _, _, _, _, _, complete = compat.GetQuestLogTitle(data.qlogid)
+        local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
+        pfQuest.tracker.ButtonAdd(data.title, { dummy = true, addon = "PFQUEST", texture = img, questid = questid })
+      end
     end
   else
     -- In other modes, only add dummy buttons for watched quests.
+    local underCollapsedHeader = false
     for qlogid = 1, 40 do
       local title, level, tag, header, collapsed, complete = compat.GetQuestLogTitle(qlogid)
-      if title and not header then
-        local watched = IsQuestWatched(qlogid)
-        if watched then
-          local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
-          pfQuest.tracker.ButtonAdd(title, { dummy = true, addon = "PFQUEST", texture = img })
+      if header then
+        underCollapsedHeader = collapsed and true or false
+      elseif title then
+        local isCollapsed = underCollapsedHeader or (collapsed and true or false)
+        if not isCollapsed then
+          local watched = IsQuestWatched(qlogid)
+          if watched then
+            local img = complete and pfQuestConfig.path .. "\\img\\complete_c" or pfQuestConfig.path .. "\\img\\complete"
+            pfQuest.tracker.ButtonAdd(title, { dummy = true, addon = "PFQUEST", texture = img })
+          end
         end
 
         found = found + 1

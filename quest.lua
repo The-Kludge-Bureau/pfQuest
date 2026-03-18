@@ -16,6 +16,29 @@ local UnitLevel = UnitLevel
 pfQuest = CreateFrame("Frame")
 pfQuest.icons = {}
 
+-- Track which quest log zone headers are collapsed by wrapping the Lua API
+-- functions called by the UI buttons. This captures the true user intent
+-- before the WoW client transiently reverts the API state.
+pfQuest.collapsedZones = {}
+
+local _CollapseQuestHeader = CollapseQuestHeader
+CollapseQuestHeader = function(index)
+  local title, _, _, header = compat.GetQuestLogTitle(index)
+  if header and title then
+    pfQuest.collapsedZones[title] = true
+  end
+  return _CollapseQuestHeader(index)
+end
+
+local _ExpandQuestHeader = ExpandQuestHeader
+ExpandQuestHeader = function(index)
+  local title, _, _, header = compat.GetQuestLogTitle(index)
+  if header and title then
+    pfQuest.collapsedZones[title] = nil
+  end
+  return _ExpandQuestHeader(index)
+end
+
 if client >= 30300 then
   pfQuest.dburl = "https://www.wowhead.com/wotlk/quest="
 elseif client >= 20400 then
@@ -132,11 +155,39 @@ pfQuest:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_LEVEL_UP" or event == "PLAYER_ENTERING_WORLD" then
     pfQuest.updateQuestGivers = true
+    if event == "PLAYER_ENTERING_WORLD" then
+      -- Sync collapsedZones with the API state on login/reload since the
+      -- wrappers only track changes made during the current session.
+      for qlogid = 1, 40 do
+        local title, _, _, header, collapsed = compat.GetQuestLogTitle(qlogid)
+        if header and title then
+          if collapsed then
+            pfQuest.collapsedZones[title] = true
+          else
+            pfQuest.collapsedZones[title] = nil
+          end
+        end
+      end
+    end
   else
     pfQuest.updateQuestLog = true
   end
 
   if event == "QUEST_LOG_UPDATE" then
+    -- Update data.collapsed from pfQuest.collapsedZones which is maintained
+    -- by the CollapseQuestHeader/ExpandQuestHeader wrappers. Those capture
+    -- the true user intent before the WoW API transiently reverts.
+    if pfQuest.questlog then
+      for questid, data in pairs(pfQuest.questlog) do
+        local zone = data.zone
+        local isCollapsed = (zone and pfQuest.collapsedZones[zone]) and true or false
+        local wasCollapsed = data.collapsed and true or false
+        if isCollapsed ~= wasCollapsed then
+          data.collapsed = isCollapsed
+          pfMap.queue_update = GetTime()
+        end
+      end
+    end
     -- lock initial scan during incoming events
     if this.lock and this.lock > GetTime() then
       this.lock = GetTime() + 1.5
@@ -296,14 +347,20 @@ function pfQuest:UpdateQuestlog()
   local _, numQuests = GetNumQuestLogEntries()
   local found = 0
   local change = nil
+  local underCollapsedHeader = false
+  local currentZone = nil
 
   -- iterate over all quests
   for qlogid = 1, 40 do
-    local title, _, _, header, _, complete = compat.GetQuestLogTitle(qlogid)
+    local title, _, _, header, collapsed, complete = compat.GetQuestLogTitle(qlogid)
     local objectives = GetNumQuestLeaderBoards(qlogid)
     local watched, questid, state
 
-    if title and not header then
+    if header then
+      -- track the collapsed state and zone name for subsequent quests
+      underCollapsedHeader = collapsed and true or false
+      currentZone = title
+    elseif title then
       questid = pfDatabase:GetQuestIDs(qlogid)
       questid = questid and tonumber(questid[1]) or title
       watched = IsQuestWatched(qlogid)
@@ -319,6 +376,10 @@ function pfQuest:UpdateQuestlog()
       end
       state = concat(stateParts)
 
+      -- Some WoW clients (e.g. group/dungeon/raid quests) set collapsed=true on the
+      -- individual quest entry itself rather than (or in addition to) the zone header.
+      local effectiveCollapsed = underCollapsedHeader or (collapsed and true or false)
+
       -- add new quest to the questlog
       if not pfQuest.questlog[questid] then
         queueAdd({ title, questid, qlogid, "NEW" })
@@ -326,22 +387,32 @@ function pfQuest:UpdateQuestlog()
           title = title,
           qlogid = qlogid,
           state = state,
+          collapsed = effectiveCollapsed,
+          zone = currentZone,
         }
         change = true
       elseif pfQuest.questlog[questid].qlogid ~= qlogid then
+        local oldQlogid = pfQuest.questlog[questid].qlogid
         queueAdd({ title, questid, qlogid, "RELOAD" })
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
         pfQuest.questlog_tmp[questid].qlogid = qlogid
         pfQuest.questlog_tmp[questid].state = state
+        -- zone is set once at NEW time and preserved; do not update here
+        -- because qlogid shifts during collapse put quests under wrong headers
+        -- collapsed is set by OnEvent and preserved here intentionally
         change = true
       elseif pfQuest.questlog[questid].state ~= state then
         queueAdd({ title, questid, qlogid, "RELOAD" })
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
         pfQuest.questlog_tmp[questid].qlogid = qlogid
         pfQuest.questlog_tmp[questid].state = state
+        -- zone is set once at NEW time and preserved
+        -- collapsed is set by OnEvent and preserved here intentionally
         change = true
       else
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
+        -- zone is set once at NEW time and preserved
+        -- collapsed is set by OnEvent and preserved here intentionally
       end
 
       found = found + 1
@@ -354,8 +425,17 @@ function pfQuest:UpdateQuestlog()
   -- quest removal events
   for questid, data in pairs(pfQuest.questlog) do
     if not pfQuest.questlog_tmp[questid] then
-      queueAdd({ data.title, questid, nil, "REMOVE" })
-      change = true
+      if found >= numQuests then
+        -- We found all expected quests; this one is truly gone (turned in,
+        -- abandoned, etc.).
+        queueAdd({ data.title, questid, nil, "REMOVE" })
+        change = true
+      else
+        -- found < numQuests: some quests are inaccessible (API hasn't reverted
+        -- yet). Preserve the quest to avoid a spurious REMOVE+NEW flicker.
+        -- Do NOT override collapsed state; OnEvent has already set it correctly.
+        pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
+      end
     end
   end
 
