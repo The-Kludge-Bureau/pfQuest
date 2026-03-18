@@ -813,6 +813,11 @@ function pfMap:DeleteNode(addon, title)
   end
 
   pfMap.queue_update = GetTime()
+  -- Force an immediate minimap refresh. UpdateMinimap throttles to once per
+  -- second for stationary players; clearing the tick bypasses that so the
+  -- deleted node's pin disappears within one OnUpdate tick (~0.05s) instead
+  -- of up to 1 second later.
+  pfMap.tick = nil
 end
 
 function pfMap:NodeClick()

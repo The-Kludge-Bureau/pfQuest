@@ -249,10 +249,17 @@ pfQuest:SetScript("OnUpdate", function()
           pfQuest_config["trackingmethod"] ~= 3
           and (pfQuest_config["trackingmethod"] ~= 2 or IsQuestWatched(entry[3]))
         then
-          local meta = { ["addon"] = "PFQUEST", ["qlogid"] = entry[3] }
-          local t1 = GetTime()
-          pfDatabase:SearchQuestID(entry[2], meta)
-          pfQuest:Debug(format("|cffff8800TIMER SearchQuestID: %.4fs", GetTime() - t1))
+          -- Verify the quest is still at the expected log position. If the
+          -- slot is empty or holds a different quest (e.g. turned in while
+          -- this entry was queued), skip SearchQuestID to avoid adding a
+          -- spurious complete_c node.
+          local verifyTitle = entry[3] and compat.GetQuestLogTitle(entry[3])
+          if verifyTitle == entry[1] then
+            local meta = { ["addon"] = "PFQUEST", ["qlogid"] = entry[3] }
+            local t1 = GetTime()
+            pfDatabase:SearchQuestID(entry[2], meta)
+            pfQuest:Debug(format("|cffff8800TIMER SearchQuestID: %.4fs", GetTime() - t1))
+          end
         end
       end
     end
