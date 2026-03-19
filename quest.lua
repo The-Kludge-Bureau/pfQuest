@@ -16,26 +16,19 @@ local UnitLevel = UnitLevel
 pfQuest = CreateFrame("Frame")
 pfQuest.icons = {}
 
--- Track which quest log zone headers are collapsed by wrapping the Lua API
--- functions called by the UI buttons. This captures the true user intent
--- before the WoW client transiently reverts the API state.
+-- Track which quests should be hidden because their zone header is collapsed.
+-- collapsedQuestIDs[questid] = zoneName
 --
--- collapsedZones[zoneName] = true  → which zone headers are currently collapsed
--- collapsedQuestIDs[questid] = zoneName → which questids to hide and which zone owns them
---
--- We use questid-keyed storage because some quests (a vanilla API quirk on
--- TurtleWow) appear under a DIFFERENT zone header when their real zone header
--- is collapsed. Zone-name lookups on data.zone therefore miss them. By scanning
--- visible quests at CollapseQuestHeader call time we record the true membership
--- before the API hides them.
-pfQuest.collapsedZones = {}
+-- Questid-keyed rather than zone-name-keyed because some quests appear under
+-- a different zone header when their real zone header is collapsed (vanilla API
+-- quirk). CollapseQuestHeader scans visible quests before the collapse takes
+-- effect so the true membership is recorded before the API hides them.
 pfQuest.collapsedQuestIDs = {}
 
 local _CollapseQuestHeader = CollapseQuestHeader
 CollapseQuestHeader = function(index)
   local title, _, _, header = compat.GetQuestLogTitle(index)
   if header and title then
-    pfQuest.collapsedZones[title] = true
     -- Scan quests under this header and mark them collapsed by questid.
     -- Must be done before calling the real CollapseQuestHeader because
     -- after the collapse the quests disappear from GetQuestLogTitle.
@@ -59,7 +52,6 @@ local _ExpandQuestHeader = ExpandQuestHeader
 ExpandQuestHeader = function(index)
   local title, _, _, header = compat.GetQuestLogTitle(index)
   if header and title then
-    pfQuest.collapsedZones[title] = nil
     -- Remove all questids belonging to this zone from collapsedQuestIDs.
     -- Collect keys first to avoid modifying the table mid-iteration.
     local toRemove = {}
@@ -180,14 +172,11 @@ pfQuest:SetScript("OnEvent", function()
         pfQuest_track.collapsedZones = nil
       end
 
-      -- Link collapse tracking tables to pfQuest_config so state survives reload.
-      -- The wrappers write to pfQuest.collapsedZones/collapsedQuestIDs directly;
-      -- since these are the same tables as in pfQuest_config, the SavedVariable
-      -- stays in sync for free.
+      -- Link collapsedQuestIDs to pfQuest_config so collapse state survives reload.
+      -- The wrappers write to pfQuest.collapsedQuestIDs directly; since it is the
+      -- same table as pfQuest_config.collapsedQuestIDs, the SavedVar stays in sync.
       if pfQuest_config then
-        pfQuest_config.collapsedZones = pfQuest_config.collapsedZones or {}
         pfQuest_config.collapsedQuestIDs = pfQuest_config.collapsedQuestIDs or {}
-        pfQuest.collapsedZones = pfQuest_config.collapsedZones
         pfQuest.collapsedQuestIDs = pfQuest_config.collapsedQuestIDs
       end
 
