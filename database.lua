@@ -1068,7 +1068,7 @@ function pfDatabase:SearchMetaRelation(query, meta, show)
   local maps = {}
 
   -- abort on invalid queries
-  if not query.name then
+  if not query or not query.name then
     return
   end
 
