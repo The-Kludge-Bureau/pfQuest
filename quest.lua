@@ -300,6 +300,10 @@ pfQuest:SetScript("OnUpdate", function()
       else
         pfQuest_history[entry[2]] = { time(), UnitLevel("player") }
       end
+
+      -- remove from collapsed tracking so the SavedVar doesn't accumulate
+      -- stale questids from quests that were turned in or abandoned
+      pfQuest.collapsedQuestIDs[entry[2]] = nil
       -- Mark journal dirty when history changes
       if pfJournal then
         pfJournal.dirty = true
