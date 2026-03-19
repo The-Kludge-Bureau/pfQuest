@@ -52,21 +52,26 @@ local _ExpandQuestHeader = ExpandQuestHeader
 ExpandQuestHeader = function(index)
   local title, _, _, header = compat.GetQuestLogTitle(index)
   if header and title then
-    -- Remove all questids belonging to this zone from collapsedQuestIDs.
-    -- Collect keys first to avoid modifying the table mid-iteration.
-    local toRemove = {}
-    for questid, zone in pairs(pfQuest.collapsedQuestIDs) do
-      if zone == title then
-        toRemove[questid] = true
+    if pfQuest.userClickingHeader then
+      -- User explicitly expanded this zone: clear our collapsed tracking for it.
+      -- Collect keys first to avoid modifying the table mid-iteration.
+      local toRemove = {}
+      for questid, zone in pairs(pfQuest.collapsedQuestIDs) do
+        if zone == title then
+          toRemove[questid] = true
+        end
       end
-    end
-    for questid in pairs(toRemove) do
-      pfQuest.collapsedQuestIDs[questid] = nil
-      if pfQuest.questlog[questid] then
-        pfQuest.questlog[questid].collapsed = false
+      for questid in pairs(toRemove) do
+        pfQuest.collapsedQuestIDs[questid] = nil
+        if pfQuest.questlog[questid] then
+          pfQuest.questlog[questid].collapsed = false
+        end
       end
+      pfMap.queue_update = GetTime()
     end
-    pfMap.queue_update = GetTime()
+    -- If not user-initiated (e.g. vanilla expanding a zone on quest accept/turn-in),
+    -- leave collapsedQuestIDs intact. The QLU sync will re-apply data.collapsed from
+    -- it after the subsequent QUEST_LOG_UPDATE, keeping collapsed quests off the tracker.
   end
   return _ExpandQuestHeader(index)
 end
@@ -857,7 +862,11 @@ end
 -- refresh language and url on quest selection
 local pfHookQuestLogTitleButton_OnClick = QuestLogTitleButton_OnClick
 QuestLogTitleButton_OnClick = function(self, button)
+  -- Signal that ExpandQuestHeader/CollapseQuestHeader is being triggered by the
+  -- user clicking a zone header, not by vanilla internally (e.g. on quest accept).
+  pfQuest.userClickingHeader = true
   pfHookQuestLogTitleButton_OnClick(self, button)
+  pfQuest.userClickingHeader = false
   QuestLog_Update()
 end
 
