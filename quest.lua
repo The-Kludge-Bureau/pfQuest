@@ -383,7 +383,6 @@ function pfQuest:UpdateQuestlog()
   local found = 0
   local change = nil
   local underCollapsedHeader = false
-  local currentZone = nil
 
   -- iterate over all quests
   for qlogid = 1, 40 do
@@ -392,9 +391,8 @@ function pfQuest:UpdateQuestlog()
     local watched, questid, state
 
     if header then
-      -- track the collapsed state and zone name for subsequent quests
+      -- track the collapsed state for subsequent quests
       underCollapsedHeader = collapsed and true or false
-      currentZone = title
     elseif title then
       questid = pfDatabase:GetQuestIDs(qlogid)
       questid = questid and tonumber(questid[1]) or title
@@ -428,7 +426,6 @@ function pfQuest:UpdateQuestlog()
           qlogid = qlogid,
           state = state,
           collapsed = initCollapsed,
-          zone = currentZone,
         }
         change = true
       elseif pfQuest.questlog[questid].qlogid ~= qlogid then
@@ -436,22 +433,15 @@ function pfQuest:UpdateQuestlog()
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
         pfQuest.questlog_tmp[questid].qlogid = qlogid
         pfQuest.questlog_tmp[questid].state = state
-        -- zone is set once at NEW time and preserved; do not update here
-        -- because qlogid shifts during collapse put quests under wrong headers
-        -- collapsed is set by OnEvent and preserved here intentionally
         change = true
       elseif pfQuest.questlog[questid].state ~= state then
         queueAdd({ title, questid, qlogid, "RELOAD" })
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
         pfQuest.questlog_tmp[questid].qlogid = qlogid
         pfQuest.questlog_tmp[questid].state = state
-        -- zone is set once at NEW time and preserved
-        -- collapsed is set by OnEvent and preserved here intentionally
         change = true
       else
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
-        -- zone is set once at NEW time and preserved
-        -- collapsed is set by OnEvent and preserved here intentionally
       end
 
       found = found + 1
