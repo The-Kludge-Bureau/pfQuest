@@ -520,14 +520,15 @@ function pfQuest:UpdateQuestlog()
   -- quest removal events
   for questid, data in pairs(pfQuest.questlog) do
     if not pfQuest.questlog_tmp[questid] then
-      if found >= numQuests then
+      if found >= numQuests and not pfQuest.collapsedQuestIDs[questid] then
         -- We found all expected quests; this one is truly gone (turned in,
         -- abandoned, etc.).
         queueAdd({ data.title, questid, nil, "REMOVE" })
         change = true
       else
         -- found < numQuests: some quests are inaccessible (API hasn't reverted
-        -- yet). Preserve the quest to avoid a spurious REMOVE+NEW flicker.
+        -- yet), OR the quest is hidden under a collapsed zone header. Preserve
+        -- to avoid a spurious REMOVE+NEW flicker and to keep the collapsed state.
         -- Do NOT override collapsed state; OnEvent has already set it correctly.
         pfQuest.questlog_tmp[questid] = pfQuest.questlog[questid]
       end
