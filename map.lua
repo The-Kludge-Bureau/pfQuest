@@ -1099,14 +1099,21 @@ function pfMap:UpdateNodes()
 
   local color = pfQuest_config["spawncolors"] == "1" and "spawn" or "title"
   local map = pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
-  if not map then return end
-  local i = 1
 
-  -- reset tracker
+  -- reset tracker and route before the map check so the tracker is always
+  -- updated from questlog even when the current zone is not in the database
+  -- (e.g. unknown zone, continent view). Without this the tracker frame
+  -- stays at 0px height if UpdateNodes only ever fires with map=nil.
   pfQuest.tracker.Reset()
-
-  -- reset route
   pfQuest.route:Reset()
+
+  if not map then
+    if pfQuest.tracker and pfQuest.tracker.DoLayout then
+      pfQuest.tracker.DoLayout()
+    end
+    return
+  end
+  local i = 1
 
   -- refresh all nodes
   local n_pins, n_skipped = 0, 0
