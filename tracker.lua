@@ -65,6 +65,61 @@ end
 
 local expand_states = {}
 
+local function GetQuestSortMode()
+  return pfQuest_config["trackerquestsort"] == "distance" and "distance" or "level"
+end
+
+local function UpdateSortButton()
+  if not tracker or not tracker.btnsort then
+    return
+  end
+
+  if tracker.mode == "QUEST_TRACKING" then
+    tracker.btnsort:Show()
+    if GetQuestSortMode() == "distance" then
+      tracker.btnsort.label:SetText("N")
+      tracker.btnsort.tooltip = "Quest Sort: Nearest First\n|cff33ffcc<Click>|r Sort By Level"
+    else
+      tracker.btnsort.label:SetText("L")
+      tracker.btnsort.tooltip = "Quest Sort: Level First\n|cff33ffcc<Click>|r Sort By Nearest"
+    end
+  else
+    tracker.btnsort:Hide()
+  end
+end
+
+local function UpdateQuestDistances()
+  if tracker.mode ~= "QUEST_TRACKING" or GetQuestSortMode() ~= "distance" then
+    return
+  end
+
+  local changed = nil
+  local nearest = {}
+  for _, data in ipairs((pfQuest.route and pfQuest.route.coords) or {}) do
+    local questid = data[6] or (data[3] and data[3].questid)
+    local distance = data[4]
+    if questid and distance and (not nearest[questid] or distance < nearest[questid]) then
+      nearest[questid] = distance
+    end
+  end
+
+  for _, button in pairs(tracker.buttons) do
+    if not button.empty then
+      local distance = nearest[button.questid]
+      if button.distance ~= distance then
+        button.distance = distance
+        changed = true
+      end
+    elseif button.distance then
+      button.distance = nil
+    end
+  end
+
+  if changed then
+    tracker.needsSort = true
+  end
+end
+
 tracker = CreateFrame("Frame", "pfQuestMapTracker", UIParent)
 tracker:Hide()
 tracker:SetPoint("LEFT", UIParent, "LEFT", 0, 0)
@@ -84,6 +139,8 @@ tracker:SetScript("OnEvent", function()
   else
     this:Show()
   end
+
+  UpdateSortButton()
 end)
 
 tracker:SetScript("OnMouseDown", function()
@@ -124,6 +181,15 @@ tracker:SetScript("OnUpdate", function()
 
   if pfQuestCompat.QuestWatchFrame:IsShown() then
     pfQuestCompat.QuestWatchFrame:Hide()
+  end
+
+  if tracker.mode == "QUEST_TRACKING" and GetQuestSortMode() == "distance" then
+    if not this.distanceTick or this.distanceTick < GetTime() then
+      this.distanceTick = GetTime() + 0.2
+      UpdateQuestDistances()
+    end
+  else
+    this.distanceTick = nil
   end
 
   if tracker.needsSort then
@@ -205,17 +271,51 @@ do -- button panel
 
   tracker.btnquest = CreateButton("quests", "TOPLEFT", pfQuest_Loc["Show Current Quests"], function()
     tracker.mode = "QUEST_TRACKING"
+    UpdateSortButton()
     pfMap:UpdateNodes()
   end)
 
   tracker.btndatabase = CreateButton("database", "TOPLEFT", pfQuest_Loc["Show Database Results"], function()
     tracker.mode = "DATABASE_TRACKING"
+    UpdateSortButton()
     pfMap:UpdateNodes()
   end)
 
   tracker.btngiver = CreateButton("giver", "TOPLEFT", pfQuest_Loc["Show Quest Givers"], function()
     tracker.mode = "GIVER_TRACKING"
+    UpdateSortButton()
     pfMap:UpdateNodes()
+  end)
+
+  tracker.btnsort = CreateFrame("Button", nil, tracker.panel)
+  tracker.btnsort:SetPoint("TOPRIGHT", -69, -1)
+  tracker.btnsort:SetWidth(panelheight - 2)
+  tracker.btnsort:SetHeight(panelheight - 2)
+  tracker.btnsort.tooltip = "Quest Sort"
+  tracker.btnsort.bg = tracker.btnsort:CreateTexture(nil, "BACKGROUND")
+  tracker.btnsort.bg:SetAllPoints()
+  tracker.btnsort.bg:SetTexture(0, 0, 0, 0)
+  tracker.btnsort.label = tracker.btnsort:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  tracker.btnsort.label:SetAllPoints()
+  tracker.btnsort.label:SetFont(pfUI.font_default, 11)
+  tracker.btnsort.label:SetTextColor(0.9, 0.9, 0.9, 1)
+  tracker.btnsort:SetScript("OnEnter", ShowTooltip)
+  tracker.btnsort:SetScript("OnLeave", HideTooltip)
+  tracker.btnsort:SetScript("OnClick", function()
+    if GetQuestSortMode() == "distance" then
+      pfQuest_config["trackerquestsort"] = "level"
+    else
+      pfQuest_config["trackerquestsort"] = "distance"
+    end
+
+    UpdateSortButton()
+    tracker.needsSort = true
+    tracker.distanceTick = 0
+    if pfQuest.route then
+      pfQuest.route.recalculate = nil
+      pfQuest.route.firstnode = nil
+    end
+    pfMap.queue_update = GetTime()
   end)
 
   tracker.btnclose = CreateButton("close", "TOPRIGHT", pfQuest_Loc["Close Tracker"], function()
@@ -332,8 +432,13 @@ local function trackersort(a, b)
     return (a.tracked and 1 or -1) > (b.tracked and 1 or -1)
   elseif (a.inLocalZone and 1 or -1) ~= (b.inLocalZone and 1 or -1) then
     return (a.inLocalZone and 1 or -1) > (b.inLocalZone and 1 or -1)
+  elseif tracker.mode == "QUEST_TRACKING" and GetQuestSortMode() == "distance"
+         and (a.distance or math.huge) ~= (b.distance or math.huge) then
+    return (a.distance or math.huge) < (b.distance or math.huge)
   elseif (a.level or -1) ~= (b.level or -1) then
     return (a.level or -1) > (b.level or -1)
+  elseif tracker.mode == "QUEST_TRACKING" and (a.distance or math.huge) ~= (b.distance or math.huge) then
+    return (a.distance or math.huge) < (b.distance or math.huge)
   elseif (a.perc or -1) ~= (b.perc or -1) then
     return (a.perc or -1) > (b.perc or -1)
   elseif (a.title or "") ~= (b.title or "") then
@@ -482,6 +587,7 @@ function tracker.ButtonEvent(self)
       or ""
 
     self.tracked = watched
+    self.level = tonumber(level)
     self.perc = percent
     self.text:SetText(
       string.format("%s%s |cffaaaaaa(%s%s%%|cffaaaaaa)|r", showlevel, title or "", colorperc or "", ceil(percent))
@@ -620,6 +726,7 @@ function tracker.RefreshZoneTracker()
   end
 
   tracker.needsSort = true
+  UpdateQuestDistances()
   tracker.DoLayout()
 end
 
@@ -760,6 +867,7 @@ end
 function tracker.Reset()
   tracker:SetHeight(panelheight)
   for id, button in pairs(tracker.buttons) do
+    button.distance = nil
     button.level = nil
     button.title = nil
     button.perc = nil
@@ -817,6 +925,7 @@ function tracker.Reset()
       end
     end
   end
+  UpdateSortButton()
   -- Note: DoLayout is called by UpdateNodes after all ButtonAdd calls complete
 end
 
