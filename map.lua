@@ -1156,6 +1156,8 @@ function pfMap:UpdateNodes()
           if qdata and qdata.qlogid and IsQuestWatched(qdata.qlogid) then
             watched = true
           end
+          -- Route candidates are positional tuples consumed by route.lua:
+          -- { x, y, node, distance, watched, questid }.
           pfQuest.route:AddPoint({ x, y, pfMap.pins[i], nil, watched, questid })
         end
 

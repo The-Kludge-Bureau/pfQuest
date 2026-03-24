@@ -69,6 +69,8 @@ local function GetQuestSortMode()
   return pfQuest_config["trackerquestsort"] == "distance" and "distance" or "level"
 end
 
+-- Old-client Lua can misbehave with math.huge in sort fallbacks; use a plain
+-- numeric sentinel so "no distance" always sorts last without nil comparisons.
 local DIST_FAR = 99999999
 
 local function UpdateSortButton()
@@ -97,6 +99,8 @@ local function UpdateQuestDistances()
 
   local changed = nil
   local nearest = {}
+  -- Some tracker entries fall back to title keys instead of numeric questids,
+  -- so nearest-mode needs both maps to keep tracker and route ordering aligned.
   local nearestByTitle = {}
   for _, data in ipairs((pfQuest.route and pfQuest.route.coords) or {}) do
     local questid = data[6] or (data[3] and data[3].questid)
