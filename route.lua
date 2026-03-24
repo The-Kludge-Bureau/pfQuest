@@ -203,7 +203,41 @@ pfQuest.route.IsTarget = function(node)
 end
 
 local lastpos, completed = 0, 0
+local function GetQuestSortMode()
+  return pfQuest_config["trackerquestsort"] == "distance" and "distance" or "level"
+end
+
 local function sortfunc(a, b)
+  if pfQuest_config["trackingmethod"] == 5 then
+    if (a[5] and 1 or -1) ~= (b[5] and 1 or -1) then
+      return (a[5] and 1 or -1) > (b[5] and 1 or -1)
+    end
+
+    local alevel = (a[3] and tonumber(a[3].qlvl)) or -1
+    local blevel = (b[3] and tonumber(b[3].qlvl)) or -1
+
+    if GetQuestSortMode() == "distance" then
+      if (a[4] or math.huge) ~= (b[4] or math.huge) then
+        return (a[4] or math.huge) < (b[4] or math.huge)
+      end
+      if alevel ~= blevel then
+        return alevel > blevel
+      end
+    else
+      if alevel ~= blevel then
+        return alevel > blevel
+      end
+      if (a[4] or math.huge) ~= (b[4] or math.huge) then
+        return (a[4] or math.huge) < (b[4] or math.huge)
+      end
+    end
+
+    local atitle = (a[3] and a[3].title) or ""
+    local btitle = (b[3] and b[3].title) or ""
+    if atitle ~= btitle then
+      return atitle < btitle
+    end
+  end
   return a[4] < b[4]
 end
 pfQuest.route:SetScript("OnUpdate", function()

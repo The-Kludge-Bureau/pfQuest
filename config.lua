@@ -61,6 +61,12 @@ pfQuest_defconfig = {
     default = 1,
     type = nil,
   },
+  {
+    config = "trackerquestsort",
+    text = nil,
+    default = "level",
+    type = nil,
+  },
 
   { text = L["General"], default = nil, type = "header" },
   { text = L["Enable World Map Menu"], default = "1", type = "checkbox", config = "worldmapmenu" },

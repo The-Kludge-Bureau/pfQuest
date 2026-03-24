@@ -1150,7 +1150,13 @@ function pfMap:UpdateNodes()
           or (pfQuest_config["routestarter"] == "1" and pfMap.pins[i].layer == 2)
           or pfMap.pins[i].arrow == true
         then
-          pfQuest.route:AddPoint({ x, y, pfMap.pins[i] })
+          local watched = nil
+          local questid = pfMap.pins[i].questid
+          local qdata = questid and pfQuest.questlog and pfQuest.questlog[questid]
+          if qdata and qdata.qlogid and IsQuestWatched(qdata.qlogid) then
+            watched = true
+          end
+          pfQuest.route:AddPoint({ x, y, pfMap.pins[i], nil, watched, questid })
         end
 
         -- hide cluster nodes if set
@@ -1345,15 +1351,31 @@ local zone
 pfMap:RegisterEvent("ZONE_CHANGED")
 pfMap:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 pfMap:RegisterEvent("MINIMAP_ZONE_CHANGED")
+pfMap:RegisterEvent("PLAYER_ENTERING_WORLD")
 pfMap:RegisterEvent("WORLD_MAP_UPDATE")
 pfMap:SetScript("OnEvent", function()
   -- save current zone
   zone = GetCurrentMapZone()
 
   -- set map to current zone when possible
-  if event == "ZONE_CHANGED" or event == "MINIMAP_ZONE_CHANGED" or event == "ZONE_CHANGED_NEW_AREA" then
+  if event == "ZONE_CHANGED" or event == "MINIMAP_ZONE_CHANGED"
+     or event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_ENTERING_WORLD" then
     if not WorldMapFrame:IsShown() then
       SetMapToCurrentZone()
+      -- Cache the player's physical zone while the map is synced to it.
+      -- GetMapID is safe here because SetMapToCurrentZone() was just called.
+      pfMap.playerZone = pfMap:GetMapIDByName(GetRealZoneText())
+        or pfMap:GetMapID(GetCurrentMapContinent(), GetCurrentMapZone())
+    else
+      -- Map is open; only trust GetRealZoneText() which reads physical zone.
+      -- GetMapID would return the user-browsed zone, not the player's.
+      pfMap.playerZone = pfMap:GetMapIDByName(GetRealZoneText())
+    end
+
+    -- Mode 5: refresh tracker from player's physical zone,
+    -- independent of UpdateNodes (which may not run in instances)
+    if pfQuest and pfQuest.tracker and pfQuest.tracker.RefreshZoneTracker then
+      pfQuest.tracker.RefreshZoneTracker()
     end
   end
 
@@ -1445,6 +1467,11 @@ pfMap:SetScript("OnUpdate", function()
     if not questBusy then
       pfMap.queue_update = nil
       pfMap:UpdateNodes()
+      -- Mode 5: refresh tracker after quest nodes are rebuilt.
+      -- Runs even when UpdateNodes exits early (e.g. instances).
+      if pfQuest and pfQuest.tracker and pfQuest.tracker.RefreshZoneTracker then
+        pfQuest.tracker.RefreshZoneTracker()
+      end
     end
   end
 
