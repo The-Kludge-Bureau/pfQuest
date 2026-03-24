@@ -374,7 +374,10 @@ function tracker.ButtonEvent(self)
   end
 
   -- update button icon
-  if node.texture then
+  if node.mode5local then
+    self.icon:SetTexture(pfQuestConfig.path .. "\\img\\node")
+    self.icon:SetVertexColor(pfMap.str2rgb(title))
+  elseif node.texture then
     self.icon:SetTexture(node.texture)
 
     local r, g, b = unpack(node.vertex or { 0, 0, 0 })
@@ -564,6 +567,24 @@ function tracker.RefreshZoneTracker()
   tracker.Reset()
 
   local seen = {}
+  local playerZone = pfMap.playerZone
+  local localQuestNodes = {}
+
+  -- Collect one representative real node per quest in the player's current
+  -- zone so tracker entries can reuse the same icon metadata as map pins.
+  if playerZone and pfMap.nodes["PFQUEST"] and pfMap.nodes["PFQUEST"][playerZone] then
+    for coords, coordNode in pairs(pfMap.nodes["PFQUEST"][playerZone]) do
+      for title, node in pairs(coordNode) do
+        local qid = node.questid or title
+        if pfQuest.questlog[qid] and not pfQuest.questlog[qid].collapsed then
+          local current = localQuestNodes[qid]
+          if not current or ((not current.texture and node.texture) or (current.dummy and not node.dummy)) then
+            localQuestNodes[qid] = node
+          end
+        end
+      end
+    end
+  end
 
   -- Always include watched quests, even when their objectives are outside the
   -- current zone. The existing sort puts watched quests at the top.
@@ -571,35 +592,29 @@ function tracker.RefreshZoneTracker()
     local qtitle, _, _, _, _, complete = compat.GetQuestLogTitle(data.qlogid)
     if qtitle == data.title and IsQuestWatched(data.qlogid) then
       seen[qid] = true
-      local img = complete and pfQuestConfig.path .. "\\img\\complete_c"
-        or pfQuestConfig.path .. "\\img\\complete"
-      tracker.ButtonAdd(data.title, {
-        dummy = true, addon = "PFQUEST", texture = img, questid = qid, force = true
-      })
+      if localQuestNodes[qid] then
+        localQuestNodes[qid].mode5local = true
+        tracker.ButtonAdd(data.title, localQuestNodes[qid])
+      else
+        local img = complete and pfQuestConfig.path .. "\\img\\complete_c"
+          or pfQuestConfig.path .. "\\img\\complete"
+        tracker.ButtonAdd(data.title, {
+          dummy = true, addon = "PFQUEST", texture = img, questid = qid, force = true
+        })
+      end
     end
   end
 
-  -- Populate from player's physical zone (works in instances).
-  -- pfMap.playerZone is cached on zone change / login in map.lua.
-  local playerZone = pfMap.playerZone
-  if playerZone and pfMap.nodes["PFQUEST"] and pfMap.nodes["PFQUEST"][playerZone] then
-    for coords, coordNode in pairs(pfMap.nodes["PFQUEST"][playerZone]) do
-      for title, node in pairs(coordNode) do
-        local qid = node.questid or title
-        if not seen[qid] and pfQuest.questlog[qid]
-           and not pfQuest.questlog[qid].collapsed then
-          seen[qid] = true
-          local data = pfQuest.questlog[qid]
-          -- Guard against stale/shifted qlogid (same pattern as ButtonEvent)
-          local qtitle, _, _, _, _, complete = compat.GetQuestLogTitle(data.qlogid)
-          if qtitle == data.title then
-            local img = complete and pfQuestConfig.path .. "\\img\\complete_c"
-              or pfQuestConfig.path .. "\\img\\complete"
-            tracker.ButtonAdd(data.title, {
-              dummy = true, addon = "PFQUEST", texture = img, questid = qid
-            })
-          end
-        end
+  -- Add remaining current-zone quests using their real node data so the
+  -- tracker icon matches the actual PFQUEST pin/minimap representation.
+  for qid, node in pairs(localQuestNodes) do
+    if not seen[qid] then
+      local data = pfQuest.questlog[qid]
+      local qtitle = data and compat.GetQuestLogTitle(data.qlogid)
+      if data and qtitle == data.title then
+        seen[qid] = true
+        node.mode5local = true
+        tracker.ButtonAdd(data.title, node)
       end
     end
   end
@@ -615,7 +630,8 @@ function tracker.ButtonAdd(title, node)
 
   -- Mode 5: only block real quest nodes from UpdateNodes while the quest tab
   -- is active. Other tracker tabs still need real nodes to populate.
-  if tracker.mode == "QUEST_TRACKING" and pfQuest_config["trackingmethod"] == 5 and not node.dummy then
+  if tracker.mode == "QUEST_TRACKING" and pfQuest_config["trackingmethod"] == 5
+     and not node.dummy and not node.mode5local then
     return
   end
 
