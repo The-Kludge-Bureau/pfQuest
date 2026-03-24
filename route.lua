@@ -206,6 +206,7 @@ local lastpos, completed = 0, 0
 local function GetQuestSortMode()
   return pfQuest_config["trackerquestsort"] == "distance" and "distance" or "level"
 end
+local DIST_FAR = 99999999
 
 local function sortfunc(a, b)
   if pfQuest_config["trackingmethod"] == 5 then
@@ -217,8 +218,8 @@ local function sortfunc(a, b)
     local blevel = (b[3] and tonumber(b[3].qlvl)) or -1
 
     if GetQuestSortMode() == "distance" then
-      if (a[4] or math.huge) ~= (b[4] or math.huge) then
-        return (a[4] or math.huge) < (b[4] or math.huge)
+      if (a[4] or DIST_FAR) ~= (b[4] or DIST_FAR) then
+        return (a[4] or DIST_FAR) < (b[4] or DIST_FAR)
       end
       if alevel ~= blevel then
         return alevel > blevel
@@ -227,8 +228,8 @@ local function sortfunc(a, b)
       if alevel ~= blevel then
         return alevel > blevel
       end
-      if (a[4] or math.huge) ~= (b[4] or math.huge) then
-        return (a[4] or math.huge) < (b[4] or math.huge)
+      if (a[4] or DIST_FAR) ~= (b[4] or DIST_FAR) then
+        return (a[4] or DIST_FAR) < (b[4] or DIST_FAR)
       end
     end
 

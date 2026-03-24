@@ -69,6 +69,8 @@ local function GetQuestSortMode()
   return pfQuest_config["trackerquestsort"] == "distance" and "distance" or "level"
 end
 
+local DIST_FAR = 99999999
+
 local function UpdateSortButton()
   if not tracker or not tracker.btnsort then
     return
@@ -95,17 +97,22 @@ local function UpdateQuestDistances()
 
   local changed = nil
   local nearest = {}
+  local nearestByTitle = {}
   for _, data in ipairs((pfQuest.route and pfQuest.route.coords) or {}) do
     local questid = data[6] or (data[3] and data[3].questid)
     local distance = data[4]
     if questid and distance and (not nearest[questid] or distance < nearest[questid]) then
       nearest[questid] = distance
     end
+    local title = data[3] and data[3].title
+    if title and distance and (not nearestByTitle[title] or distance < nearestByTitle[title]) then
+      nearestByTitle[title] = distance
+    end
   end
 
   for _, button in pairs(tracker.buttons) do
     if not button.empty then
-      local distance = nearest[button.questid]
+      local distance = nearest[button.questid] or nearestByTitle[button.title]
       if button.distance ~= distance then
         button.distance = distance
         changed = true
@@ -433,12 +440,12 @@ local function trackersort(a, b)
   elseif (a.inLocalZone and 1 or -1) ~= (b.inLocalZone and 1 or -1) then
     return (a.inLocalZone and 1 or -1) > (b.inLocalZone and 1 or -1)
   elseif tracker.mode == "QUEST_TRACKING" and GetQuestSortMode() == "distance"
-         and (a.distance or math.huge) ~= (b.distance or math.huge) then
-    return (a.distance or math.huge) < (b.distance or math.huge)
+         and (a.distance or DIST_FAR) ~= (b.distance or DIST_FAR) then
+    return (a.distance or DIST_FAR) < (b.distance or DIST_FAR)
   elseif (a.level or -1) ~= (b.level or -1) then
     return (a.level or -1) > (b.level or -1)
-  elseif tracker.mode == "QUEST_TRACKING" and (a.distance or math.huge) ~= (b.distance or math.huge) then
-    return (a.distance or math.huge) < (b.distance or math.huge)
+  elseif tracker.mode == "QUEST_TRACKING" and (a.distance or DIST_FAR) ~= (b.distance or DIST_FAR) then
+    return (a.distance or DIST_FAR) < (b.distance or DIST_FAR)
   elseif (a.perc or -1) ~= (b.perc or -1) then
     return (a.perc or -1) > (b.perc or -1)
   elseif (a.title or "") ~= (b.title or "") then
