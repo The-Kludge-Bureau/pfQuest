@@ -25,10 +25,37 @@ pfQuest.icons = {}
 -- effect so the true membership is recorded before the API hides them.
 pfQuest.collapsedQuestIDs = {}
 
+local function questInPlayerZone(questid)
+  local playerZone = pfMap and pfMap.playerZone
+  if not playerZone or not pfMap.nodes or not pfMap.nodes["PFQUEST"] or not pfMap.nodes["PFQUEST"][playerZone] then
+    return nil
+  end
+
+  for _, coordNode in pairs(pfMap.nodes["PFQUEST"][playerZone]) do
+    for _, node in pairs(coordNode) do
+      if (node.questid or node.title) == questid then
+        return true
+      end
+    end
+  end
+
+  return nil
+end
+
+local function questAffectsCurrentZoneTracker(questid)
+  local data = pfQuest.questlog and pfQuest.questlog[questid]
+  if data and data.qlogid and IsQuestWatched(data.qlogid) then
+    return true
+  end
+
+  return questInPlayerZone(questid)
+end
+
 local _CollapseQuestHeader = CollapseQuestHeader
 CollapseQuestHeader = function(index)
   local title, _, _, header = compat.GetQuestLogTitle(index)
   if header and title then
+    local affectsCurrentZoneTracker = nil
     -- Scan quests under this header and mark them collapsed by questid.
     -- Must be done before calling the real CollapseQuestHeader because
     -- after the collapse the quests disappear from GetQuestLogTitle.
@@ -39,11 +66,21 @@ CollapseQuestHeader = function(index)
         if data.title == qtitle then
           pfQuest.collapsedQuestIDs[questid] = title
           data.collapsed = true
+          if not affectsCurrentZoneTracker and pfQuest_config["trackingmethod"] == 5
+             and questAffectsCurrentZoneTracker(questid) then
+            affectsCurrentZoneTracker = true
+          end
           break
         end
       end
     end
-    pfMap.queue_update = GetTime()
+    if pfQuest_config["trackingmethod"] == 5 then
+      if affectsCurrentZoneTracker and pfQuest.tracker and pfQuest.tracker.RefreshZoneTracker then
+        pfQuest.tracker.RefreshZoneTracker()
+      end
+    else
+      pfMap.queue_update = GetTime()
+    end
   end
   return _CollapseQuestHeader(index)
 end
@@ -56,9 +93,14 @@ ExpandQuestHeader = function(index)
       -- User explicitly expanded this zone: clear our collapsed tracking for it.
       -- Collect keys first to avoid modifying the table mid-iteration.
       local toRemove = {}
+      local affectsCurrentZoneTracker = nil
       for questid, zone in pairs(pfQuest.collapsedQuestIDs) do
         if zone == title then
           toRemove[questid] = true
+          if not affectsCurrentZoneTracker and pfQuest_config["trackingmethod"] == 5
+             and questAffectsCurrentZoneTracker(questid) then
+            affectsCurrentZoneTracker = true
+          end
         end
       end
       for questid in pairs(toRemove) do
@@ -67,7 +109,13 @@ ExpandQuestHeader = function(index)
           pfQuest.questlog[questid].collapsed = false
         end
       end
-      pfMap.queue_update = GetTime()
+      if pfQuest_config["trackingmethod"] == 5 then
+        if affectsCurrentZoneTracker and pfQuest.tracker and pfQuest.tracker.RefreshZoneTracker then
+          pfQuest.tracker.RefreshZoneTracker()
+        end
+      else
+        pfMap.queue_update = GetTime()
+      end
     end
     -- If not user-initiated (e.g. vanilla expanding a zone on quest accept/turn-in),
     -- leave collapsedQuestIDs intact. The QLU sync will re-apply data.collapsed from
@@ -216,12 +264,23 @@ pfQuest:SetScript("OnEvent", function()
     -- it directly on user action; this handles any edge cases where data.collapsed
     -- drifts (e.g. quest log rebuilt after a zone change).
     if pfQuest.questlog then
+      local affectsCurrentZoneTracker = nil
       for questid, data in pairs(pfQuest.questlog) do
         local isCollapsed = pfQuest.collapsedQuestIDs[questid] and true or false
         if isCollapsed ~= (data.collapsed and true or false) then
           data.collapsed = isCollapsed
-          pfMap.queue_update = GetTime()
+          if pfQuest_config["trackingmethod"] == 5 then
+            if not affectsCurrentZoneTracker and questAffectsCurrentZoneTracker(questid) then
+              affectsCurrentZoneTracker = true
+            end
+          else
+            pfMap.queue_update = GetTime()
+          end
         end
+      end
+      if pfQuest_config["trackingmethod"] == 5 and affectsCurrentZoneTracker
+         and pfQuest.tracker and pfQuest.tracker.RefreshZoneTracker then
+        pfQuest.tracker.RefreshZoneTracker()
       end
     end
     -- lock initial scan during incoming events
@@ -745,6 +804,16 @@ function pfQuest:AddWorldMapIntegration()
 
       local info = {}
       info.text = pfQuest_Loc["Hide Quests"]
+      info.checked = false
+      info.func = function()
+        UIDropDownMenu_SetSelectedID(pfQuest.mapButton, this:GetID(), 0)
+        pfQuest_config["trackingmethod"] = this:GetID()
+        pfQuest:ResetAll()
+      end
+      UIDropDownMenu_AddButton(info)
+
+      local info = {}
+      info.text = pfQuest_Loc["Current Zone"]
       info.checked = false
       info.func = function()
         UIDropDownMenu_SetSelectedID(pfQuest.mapButton, this:GetID(), 0)

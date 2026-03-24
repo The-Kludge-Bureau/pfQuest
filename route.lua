@@ -204,6 +204,9 @@ end
 
 local lastpos, completed = 0, 0
 local function sortfunc(a, b)
+  if pfQuest_config["trackingmethod"] == 5 and (a[5] and true or false) ~= (b[5] and true or false) then
+    return (a[5] and 1 or -1) > (b[5] and 1 or -1)
+  end
   return a[4] < b[4]
 end
 pfQuest.route:SetScript("OnUpdate", function()
