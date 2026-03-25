@@ -345,6 +345,8 @@ function pfQuestConfig:CreateConfigEntries(config)
 
         pfUI.api.CreateBackdrop(frame.input, nil, true)
       elseif data.type == "slider" then
+        -- Copy slider-specific values out of the loop table so the callback
+        -- keeps stable bounds/config even after CreateConfigEntries continues.
         local minval = data.min
         local maxval = data.max
         local config = data.config
@@ -386,7 +388,8 @@ function pfQuestConfig:CreateConfigEntries(config)
           val = max(minval, min(maxval, val))
           val = floor(val * 10 + 0.5) / 10
 
-          -- normalize slider position to rounded value
+          -- Snap the thumb back onto the stored tenth-step so slider position,
+          -- label text, and saved config all stay visually in sync.
           this:SetValue(val)
 
           pfQuest_config[this.config] = tostring(val)
@@ -468,6 +471,8 @@ function pfQuestConfig:UpdateConfigEntries()
         local newval = tonumber(pfQuest_config[data.config]) or tonumber(data.default) or 1
         newval = floor(newval * 10 + 0.5) / 10
         local oldval = floor(configframes[data.text].input:GetValue() * 10 + 0.5) / 10
+        -- Avoid bouncing the slider callback when the UI is already showing
+        -- the same rounded value that the config stores.
         if oldval ~= newval then
           configframes[data.text].input:SetValue(newval)
         end
