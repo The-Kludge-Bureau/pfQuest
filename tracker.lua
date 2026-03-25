@@ -226,6 +226,19 @@ tracker.buttons = {}
 tracker.buttonByTitle = {} -- reverse map: title → button index, for O(1) duplicate detection
 tracker.mode = "QUEST_TRACKING"
 
+function tracker.RefreshNearestDistances()
+  if tracker.mode ~= "QUEST_TRACKING" or GetQuestSortMode() ~= "distance" then
+    return
+  end
+
+  tracker.distanceTick = GetTime() + 0.2
+  UpdateQuestDistances()
+
+  if tracker.needsSort then
+    tracker.DoLayout()
+  end
+end
+
 tracker.backdrop = CreateFrame("Frame", nil, tracker)
 tracker.backdrop:SetAllPoints(tracker)
 tracker.backdrop.bg = tracker.backdrop:CreateTexture(nil, "BACKGROUND")
