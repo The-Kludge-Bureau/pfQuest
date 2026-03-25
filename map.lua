@@ -56,6 +56,8 @@ controlkey:SetScript("OnUpdate", function()
   end
 end)
 
+local mainmap_inversescale = 1.0
+
 local validmaps = setmetatable({}, { __mode = "kv" })
 local rgbcache = setmetatable({}, { __mode = "kv" })
 local minimap_sizes = pfDB["minimap"]
@@ -1072,11 +1074,28 @@ function pfMap:UpdateNode(frame, node, color, obj, distance)
     frame:SetScript("OnClick", (frame.func or pfMap.NodeClick))
   end
 
+  pfMap:ResizeNode(frame, obj)
+
+  frame.node = node
+end
+
+function pfMap:ResizeNode(frame, obj)
   local highlight = frame.texture and pfMap.highlightdb[frame][pfMap.highlight] and true or nil
   local target = frame.texture and pfQuest.route and pfQuest.route.IsTarget(frame) or nil
 
   -- set default sizes for different node types
   frame.defsize = (frame.cluster or frame.layer == 4) and 18 or 14
+
+  -- Adjust node size if main map is zoomed in/out
+  if (obj ~= "minimap") then
+    if (frame.title and pfQuest.icons[frame.title]) or frame.icon then
+      -- Adjust for icons being 1 unit smaller than their parent frame
+      -- Looks better to keep the icon size constant even if the frame grows a bit.
+      frame.defsize = (frame.defsize - 2) * (mainmap_inversescale) + 2
+    else
+      frame.defsize = frame.defsize * mainmap_inversescale
+    end
+  end
 
   -- make the current route target visible
   if target then
@@ -1090,8 +1109,16 @@ function pfMap:UpdateNode(frame, node, color, obj, distance)
     frame:SetWidth(frame.defsize)
     frame:SetHeight(frame.defsize)
   end
+end
 
-  frame.node = node
+function pfMap:ResizeNodes()
+  local i = 1
+  if pfMap.pins then
+    while pfMap.pins[i] and pfMap.pins[i]:IsShown() do
+      pfMap:ResizeNode(pfMap.pins[i])
+      i = i + 1
+    end
+  end
 end
 
 function pfMap:UpdateNodes()
@@ -1540,3 +1567,22 @@ if compat.client >= 30300 then
     end
   end
 end
+
+-- Resize icons on map zoom change
+function pfMap:OnMapScaleChanged(frame, scale, hookedfunction)
+  hookedfunction(frame, scale)
+  local new_inversescale = 1.0 / WorldMapButton:GetEffectiveScale()
+  if (mainmap_inversescale ~= new_inversescale) then
+    mainmap_inversescale = new_inversescale
+    pfMap:ResizeNodes()
+  end
+end
+-- Listen for WorldMapFrame scale changes
+local pfHookWorldMapFrame_SetScale = WorldMapFrame.SetScale
+WorldMapFrame.SetScale = function(frame, scale) pfMap:OnMapScaleChanged(frame, scale, pfHookWorldMapFrame_SetScale) end
+-- Listen for WorldMapDetailFrame scale changes
+local pfHookWorldMapDetailFrame_SetScale = WorldMapDetailFrame.SetScale
+WorldMapDetailFrame.SetScale = function(frame, scale) pfMap:OnMapScaleChanged(frame, scale, pfHookWorldMapDetailFrame_SetScale) end
+-- Listen for WorldMapButton scale changes
+local pfHookWorldMapButton_SetScale = WorldMapButton.SetScale
+WorldMapButton.SetScale = function(frame, scale) pfMap:OnMapScaleChanged(frame, scale, pfHookWorldMapButton_SetScale) end
