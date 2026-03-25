@@ -56,6 +56,7 @@ controlkey:SetScript("OnUpdate", function()
   end
 end)
 
+local mainmap_base_effective_scale = nil
 local mainmap_inversescale = 1.0
 
 local validmaps = setmetatable({}, { __mode = "kv" })
@@ -1112,11 +1113,11 @@ function pfMap:ResizeNode(frame, obj)
 end
 
 function pfMap:ResizeNodes()
-  local i = 1
   if pfMap.pins then
-    while pfMap.pins[i] and pfMap.pins[i]:IsShown() do
-      pfMap:ResizeNode(pfMap.pins[i])
-      i = i + 1
+    for i = 1, table.getn(pfMap.pins) do
+      if pfMap.pins[i]:IsShown() then
+        pfMap:ResizeNode(pfMap.pins[i])
+      end
     end
   end
 end
@@ -1570,8 +1571,11 @@ end
 
 -- Resize icons on map zoom change
 function pfMap:OnMapScaleChanged(frame, scale, hookedfunction)
+  if not mainmap_base_effective_scale then
+    mainmap_base_effective_scale = WorldMapButton:GetEffectiveScale()
+  end
   hookedfunction(frame, scale)
-  local new_inversescale = 1.0 / WorldMapButton:GetEffectiveScale()
+  local new_inversescale = mainmap_base_effective_scale / WorldMapButton:GetEffectiveScale()
   if (mainmap_inversescale ~= new_inversescale) then
     mainmap_inversescale = new_inversescale
     pfMap:ResizeNodes()
