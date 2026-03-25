@@ -44,6 +44,8 @@ end
 
 local function questAffectsCurrentZoneTracker(questid)
   local data = pfQuest.questlog and pfQuest.questlog[questid]
+  -- Current Zone mode still shows watched off-zone quests at the top, so a
+  -- collapse/expand on those quests must refresh the tracker too.
   if data and data.qlogid and IsQuestWatched(data.qlogid) then
     return true
   end

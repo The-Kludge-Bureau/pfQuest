@@ -206,9 +206,14 @@ local lastpos, completed = 0, 0
 local function GetQuestSortMode()
   return pfQuest_config["trackerquestsort"] == "distance" and "distance" or "level"
 end
+-- Match tracker.lua's fallback behavior so missing route distances sort last
+-- without relying on math.huge on older clients.
+local DIST_FAR = 99999999
 
 local function sortfunc(a, b)
   if pfQuest_config["trackingmethod"] == 5 then
+    -- Route tuples are { x, y, node, distance, watched, questid }
+    -- Watched quests stay ahead of all local non-watched candidates in mode 5.
     if (a[5] and 1 or -1) ~= (b[5] and 1 or -1) then
       return (a[5] and 1 or -1) > (b[5] and 1 or -1)
     end
@@ -217,21 +222,27 @@ local function sortfunc(a, b)
     local blevel = (b[3] and tonumber(b[3].qlvl)) or -1
 
     if GetQuestSortMode() == "distance" then
-      if (a[4] or math.huge) ~= (b[4] or math.huge) then
-        return (a[4] or math.huge) < (b[4] or math.huge)
+      -- "Nearest" mode still keeps watched quests first; after that, prefer the
+      -- closest current-map objective and only use quest level as a tie-breaker.
+      if (a[4] or DIST_FAR) ~= (b[4] or DIST_FAR) then
+        return (a[4] or DIST_FAR) < (b[4] or DIST_FAR)
       end
       if alevel ~= blevel then
         return alevel > blevel
       end
     else
+      -- "Level" mode flips the middle priority: higher quest level wins first,
+      -- then distance breaks ties so the chosen target still feels local.
       if alevel ~= blevel then
         return alevel > blevel
       end
-      if (a[4] or math.huge) ~= (b[4] or math.huge) then
-        return (a[4] or math.huge) < (b[4] or math.huge)
+      if (a[4] or DIST_FAR) ~= (b[4] or DIST_FAR) then
+        return (a[4] or DIST_FAR) < (b[4] or DIST_FAR)
       end
     end
 
+    -- Final stable tie-breaker so equal watched/level/distance candidates do
+    -- not reshuffle unpredictably between updates.
     local atitle = (a[3] and a[3].title) or ""
     local btitle = (b[3] and b[3].title) or ""
     if atitle ~= btitle then
