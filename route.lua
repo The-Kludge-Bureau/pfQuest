@@ -560,32 +560,106 @@ pfQuest.route.arrow:SetScript("OnUpdate", function()
   this.model:SetAlpha(alpha)
 end)
 
-pfQuest.route.arrow.texture = pfQuest.route.arrow:CreateTexture("pfQuestRouteNodeTexture", "OVERLAY")
-pfQuest.route.arrow.texture:SetWidth(28)
-pfQuest.route.arrow.texture:SetHeight(28)
-pfQuest.route.arrow.texture:SetPoint("BOTTOM", 0, 0)
+-- Keep the outer arrow frame as the stable drag/anchor box and scale a child container instead
+pfQuest.route.arrow.content = CreateFrame("Frame", nil, pfQuest.route.arrow)
+pfQuest.route.arrow.content:SetPoint("TOPLEFT", pfQuest.route.arrow, "TOPLEFT", -80, 0)
+pfQuest.route.arrow.content:SetPoint("BOTTOMRIGHT", pfQuest.route.arrow, "BOTTOMRIGHT", 80, -54)
 
-pfQuest.route.arrow.model = pfQuest.route.arrow:CreateTexture("pfQuestRouteArrow", "MEDIUM")
+pfQuest.route.arrow.model = pfQuest.route.arrow.content:CreateTexture("pfQuestRouteArrow", "MEDIUM")
 pfQuest.route.arrow.model:SetTexture(pfQuestConfig.path .. "\\img\\arrow")
 pfQuest.route.arrow.model:SetTexCoord(0, 0, 0.109375, 0.08203125)
-pfQuest.route.arrow.model:SetAllPoints()
+pfQuest.route.arrow.model:SetWidth(48)
+pfQuest.route.arrow.model:SetHeight(36)
+pfQuest.route.arrow.model:SetPoint("TOP", pfQuest.route.arrow.content, "TOP", 0, 0)
 
-pfQuest.route.arrow.title = pfQuest.route.arrow:CreateFontString("pfQuestRouteText", "HIGH", "GameFontWhite")
+pfQuest.route.arrow.texture = pfQuest.route.arrow.content:CreateTexture("pfQuestRouteNodeTexture", "OVERLAY")
+pfQuest.route.arrow.texture:SetWidth(28)
+pfQuest.route.arrow.texture:SetHeight(28)
+pfQuest.route.arrow.texture:SetPoint("BOTTOM", pfQuest.route.arrow.model, "BOTTOM", 0, 0)
+
+pfQuest.route.arrow.title = pfQuest.route.arrow.content:CreateFontString("pfQuestRouteText", "HIGH", "GameFontWhite")
 pfQuest.route.arrow.title:SetPoint("TOP", pfQuest.route.arrow.model, "BOTTOM", 0, -10)
 pfQuest.route.arrow.title:SetFont(pfUI.font_default, pfUI_config.global.font_size + 1, "OUTLINE")
 pfQuest.route.arrow.title:SetTextColor(1, 0.8, 0)
 pfQuest.route.arrow.title:SetJustifyH("CENTER")
 
-pfQuest.route.arrow.description = pfQuest.route.arrow:CreateFontString("pfQuestRouteText", "HIGH", "GameFontWhite")
+pfQuest.route.arrow.description = pfQuest.route.arrow.content:CreateFontString("pfQuestRouteText", "HIGH", "GameFontWhite")
 pfQuest.route.arrow.description:SetPoint("TOP", pfQuest.route.arrow.title, "BOTTOM", 0, -2)
 pfQuest.route.arrow.description:SetFont(pfUI.font_default, pfUI_config.global.font_size, "OUTLINE")
 pfQuest.route.arrow.description:SetTextColor(1, 1, 1)
 pfQuest.route.arrow.description:SetJustifyH("CENTER")
 
-pfQuest.route.arrow.distance = pfQuest.route.arrow:CreateFontString("pfQuestRouteDistance", "HIGH", "GameFontWhite")
+pfQuest.route.arrow.distance = pfQuest.route.arrow.content:CreateFontString("pfQuestRouteDistance", "HIGH", "GameFontWhite")
 pfQuest.route.arrow.distance:SetPoint("TOP", pfQuest.route.arrow.description, "BOTTOM", 0, -2)
 pfQuest.route.arrow.distance:SetFont(pfUI.font_default, pfUI_config.global.font_size - 1, "OUTLINE")
 pfQuest.route.arrow.distance:SetTextColor(0.8, 0.8, 0.8)
 pfQuest.route.arrow.distance:SetJustifyH("CENTER")
 
 pfQuest.route.arrow.parent = pfQuest.route
+
+-- arrow scale method: single source of truth for both scroll wheel and config slider
+function pfQuest.route.arrow:ApplyScale()
+  local scale = tonumber(pfQuest_config["arrowscale"]) or 1
+  scale = max(0.5, min(3.0, scale))
+  scale = floor(scale * 10 + 0.5) / 10
+  pfQuest_config["arrowscale"] = tostring(scale)
+  self.content:SetScale(scale)
+end
+
+-- scale indicator: brief "1.5x" flash on scroll
+pfQuest.route.arrow.scaletext = pfQuest.route.arrow.content:CreateFontString(nil, "OVERLAY", "GameFontWhite")
+pfQuest.route.arrow.scaletext:SetPoint("BOTTOMRIGHT", pfQuest.route.arrow.model, "BOTTOMRIGHT", -2, 2)
+pfQuest.route.arrow.scaletext:SetFont(pfUI.font_default, pfUI_config.global.font_size, "OUTLINE")
+pfQuest.route.arrow.scaletext:SetJustifyH("RIGHT")
+pfQuest.route.arrow.scaletext:SetTextColor(1, 1, 1, 1)
+pfQuest.route.arrow.scaletext:Hide()
+
+pfQuest.route.arrow.scalefader = CreateFrame("Frame", nil, pfQuest.route.arrow.content)
+pfQuest.route.arrow.scalefader:Hide()
+pfQuest.route.arrow.scalefader:SetScript("OnUpdate", function()
+  local elapsed = GetTime() - this.fadetime
+  if elapsed > 1.5 then
+    pfQuest.route.arrow.scaletext:Hide()
+    this:Hide()
+    return
+  end
+  local alpha = 1.0 - (elapsed / 1.5)
+  pfQuest.route.arrow.scaletext:SetAlpha(alpha)
+end)
+
+local function ShowScaleIndicator(val)
+  pfQuest.route.arrow.scaletext:SetText(string.format("%.1fx", val))
+  pfQuest.route.arrow.scaletext:SetAlpha(1)
+  pfQuest.route.arrow.scaletext:Show()
+  pfQuest.route.arrow.scalefader.fadetime = GetTime()
+  pfQuest.route.arrow.scalefader:Show()
+end
+
+-- Extend wheel capture across the whole visible arrow block, including the
+-- text below the model, without stealing click/drag input from the parent.
+pfQuest.route.arrow.hitframe = CreateFrame("Frame", nil, pfQuest.route.arrow.content)
+pfQuest.route.arrow.hitframe:SetAllPoints(pfQuest.route.arrow.content)
+pfQuest.route.arrow.hitframe:EnableMouseWheel(true)
+
+pfQuest.route.arrow.hitframe:SetScript("OnMouseWheel", function()
+  if not IsShiftKeyDown() then
+    return
+  end
+
+  local current = tonumber(pfQuest_config["arrowscale"]) or 1
+  if arg1 > 0 then
+    current = current + 0.1
+  else
+    current = current - 0.1
+  end
+  current = max(0.5, min(3.0, current))
+  current = floor(current * 10 + 0.5) / 10
+  pfQuest_config["arrowscale"] = tostring(current)
+  pfQuest.route.arrow:ApplyScale()
+  ShowScaleIndicator(current)
+
+  -- sync config slider if visible
+  if pfQuestConfig:IsShown() then
+    pfQuestConfig:UpdateConfigEntries()
+  end
+end)

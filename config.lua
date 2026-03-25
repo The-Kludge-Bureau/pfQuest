@@ -120,6 +120,7 @@ pfQuest_defconfig = {
   { text = L["Include Quest Starters"], default = "0", type = "checkbox", config = "routestarter" },
   { text = L["Show Route On Minimap"], default = "0", type = "checkbox", config = "routeminimap" },
   { text = L["Show Arrow Along Routes"], default = "1", type = "checkbox", config = "arrow" },
+  { text = L["Arrow Scale"], default = "1.0", type = "slider", config = "arrowscale", min = 0.5, max = 3.0, step = 0.1 },
 
   { text = L["User Data"], default = nil, type = "header" },
   { text = L["Reset Configuration"], default = "1", type = "button", func = reset.config },
@@ -272,6 +273,7 @@ local maxtext = 130
 local configframes = {}
 function pfQuestConfig:CreateConfigEntries(config)
   local count = 1
+  local hasSlider = false
 
   for _, data in pairs(config) do
     if data.type then
@@ -342,6 +344,65 @@ function pfQuestConfig:CreateConfigEntries(config)
         end)
 
         pfUI.api.CreateBackdrop(frame.input, nil, true)
+      elseif data.type == "slider" then
+        -- Copy slider-specific values out of the loop table so the callback
+        -- keeps stable bounds/config even after CreateConfigEntries continues.
+        local minval = data.min
+        local maxval = data.max
+        local config = data.config
+        local default = data.default
+
+        frame.input = CreateFrame("Slider", nil, frame)
+        frame.input:SetOrientation("HORIZONTAL")
+        frame.input:SetWidth(60)
+        frame.input:SetHeight(16)
+        frame.input:SetPoint("RIGHT", -20, 0)
+        frame.input:EnableMouse(true)
+        frame.input:SetMinMaxValues(minval, maxval)
+        frame.input:SetValueStep(data.step)
+        frame.input:SetThumbTexture("Interface\\BUTTONS\\WHITE8X8")
+        frame.input.thumb = frame.input:GetThumbTexture()
+        frame.input.thumb:SetHeight(14)
+        frame.input.thumb:SetWidth(8)
+        frame.input.thumb:SetTexture(0.3, 1, 0.8, 0.5)
+        pfUI.api.CreateBackdrop(frame.input, nil, true)
+
+        frame.input.config = config
+
+        -- value label to the left of the slider
+        frame.value = frame:CreateFontString(nil, "OVERLAY", "GameFontWhite")
+        frame.value:SetFont(pfUI.font_default, pfUI_config.global.font_size, "OUTLINE")
+        frame.value:SetPoint("RIGHT", frame.input, "LEFT", -4, 0)
+        frame.value:SetTextColor(0.2, 1, 0.8, 1)
+
+        local val = tonumber(pfQuest_config[config]) or tonumber(default) or 1
+        frame.input:SetValue(val)
+        frame.value:SetText(string.format("%.1fx", val))
+
+        frame.input.updating = false
+        frame.input:SetScript("OnValueChanged", function()
+          if this.updating then return end
+          this.updating = true
+
+          local val = this:GetValue()
+          val = max(minval, min(maxval, val))
+          val = floor(val * 10 + 0.5) / 10
+
+          -- Snap the thumb back onto the stored tenth-step so slider position,
+          -- label text, and saved config all stay visually in sync.
+          this:SetValue(val)
+
+          pfQuest_config[this.config] = tostring(val)
+          frame.value:SetText(string.format("%.1fx", val))
+
+          if pfQuest and pfQuest.route and pfQuest.route.arrow then
+            pfQuest.route.arrow:ApplyScale()
+          end
+
+          this.updating = false
+        end)
+
+        hasSlider = true
       elseif data.type == "button" and data.func then
         frame.input = CreateFrame("Button", nil, frame)
         frame.input:SetWidth(32)
@@ -356,7 +417,7 @@ function pfQuestConfig:CreateConfigEntries(config)
       end
 
       -- increase size and zoom back due to blizzard backdrop reasons...
-      if frame.input and pfUI.api.emulated then
+      if frame.input and pfUI.api.emulated and data.type ~= "slider" then
         frame.input:SetWidth(frame.input:GetWidth() / 0.6)
         frame.input:SetHeight(frame.input:GetHeight() / 0.6)
         frame.input:SetScale(0.8)
@@ -370,7 +431,7 @@ function pfQuestConfig:CreateConfigEntries(config)
   end
 
   -- update sizes / positions
-  width = maxtext + 100
+  width = maxtext + (hasSlider and 140 or 100)
   local column, row = 1, 0
 
   for _, data in pairs(config) do
@@ -406,6 +467,15 @@ function pfQuestConfig:UpdateConfigEntries()
         configframes[data.text].input:SetChecked((pfQuest_config[data.config] == "1" and true or nil))
       elseif data.type == "text" then
         configframes[data.text].input:SetText(pfQuest_config[data.config])
+      elseif data.type == "slider" then
+        local newval = tonumber(pfQuest_config[data.config]) or tonumber(data.default) or 1
+        newval = floor(newval * 10 + 0.5) / 10
+        local oldval = floor(configframes[data.text].input:GetValue() * 10 + 0.5) / 10
+        -- Avoid bouncing the slider callback when the UI is already showing
+        -- the same rounded value that the config stores.
+        if oldval ~= newval then
+          configframes[data.text].input:SetValue(newval)
+        end
       end
     end
   end
@@ -434,6 +504,10 @@ pfQuestConfig:SetScript("OnEvent", function()
 
     if pfBrowserIcon and pfQuest_config["minimapbutton"] == "0" then
       pfBrowserIcon:Hide()
+    end
+
+    if pfQuest and pfQuest.route and pfQuest.route.arrow then
+      pfQuest.route.arrow:ApplyScale()
     end
   end
 end)
