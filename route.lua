@@ -160,6 +160,10 @@ pfQuest.route.Reset = function(self)
   self.lastDrawX = nil
   self.lastDrawY = nil
   self.lastDrawNode = nil
+  self.tick = nil
+  self.throttle = nil
+  self.recalculate = nil
+  self.refreshTrackerDistances = true
 end
 
 pfQuest.route.AddPoint = function(self, tbl)
@@ -312,6 +316,11 @@ pfQuest.route:SetScript("OnUpdate", function()
     end
 
     this.recalculate = GetTime() + 1
+
+    if this.refreshTrackerDistances and tracker and tracker.RefreshNearestDistances then
+      tracker:RefreshNearestDistances()
+      this.refreshTrackerDistances = nil
+    end
   end
 
   -- show arrow when route exists and is stable
@@ -438,6 +447,19 @@ end)
 
 pfQuest.route.arrow:SetScript("OnDragStop", function()
   this:StopMovingOrSizing()
+  local anchor, x, y = pfUI.api.ConvertFrameAnchor(this, pfUI.api.GetBestAnchor(this))
+  this:ClearAllPoints()
+  this:SetPoint(anchor, x, y)
+
+  -- save position
+  pfQuest_config.arrowpos = { anchor, x, y }
+end)
+
+pfQuest.route.arrow:SetScript("OnShow", function()
+  if pfQuest_config.arrowpos then
+    this:ClearAllPoints()
+    this:SetPoint(unpack(pfQuest_config.arrowpos))
+  end
 end)
 
 local invalid, lasttarget
