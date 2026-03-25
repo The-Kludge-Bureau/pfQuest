@@ -642,6 +642,10 @@ pfQuest.route.arrow.hitframe:SetAllPoints(pfQuest.route.arrow.content)
 pfQuest.route.arrow.hitframe:EnableMouseWheel(true)
 
 pfQuest.route.arrow.hitframe:SetScript("OnMouseWheel", function()
+  if not IsShiftKeyDown() then
+    return
+  end
+
   local current = tonumber(pfQuest_config["arrowscale"]) or 1
   if arg1 > 0 then
     current = current + 0.1
