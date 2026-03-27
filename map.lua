@@ -1571,11 +1571,12 @@ end
 
 -- Resize icons on map zoom change
 function pfMap:OnMapScaleChanged(frame, scale, hookedfunction)
-  hookedfunction(frame, scale)  -- apply the scale first
   if not mainmap_base_effective_scale then
-    mainmap_base_effective_scale = WorldMapButton:GetEffectiveScale()
+    mainmap_base_effective_scale = WorldMapButton:GetEffectiveScale() / WorldMapFrame:GetScale()
   end
-  local new_inversescale = mainmap_base_effective_scale / WorldMapButton:GetEffectiveScale()
+  hookedfunction(frame, scale)
+  local zoom_scale = WorldMapButton:GetEffectiveScale() / WorldMapFrame:GetScale()
+  local new_inversescale = mainmap_base_effective_scale / zoom_scale
   if (mainmap_inversescale ~= new_inversescale) then
     mainmap_inversescale = new_inversescale
     pfMap:ResizeNodes()
