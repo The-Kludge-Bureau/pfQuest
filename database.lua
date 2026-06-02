@@ -493,6 +493,13 @@ pfDatabase.lastQuestGiversSet = {}
 -- Covers: wrong race, wrong class, missing loc name.
 pfDatabase.staticRejectSet = {}
 
+-- Index of exact quest title -> { id, id, ... }. Lets GetQuestIDs resolve a
+-- questlog entry to its DB id in O(1) instead of scanning the whole quest
+-- table on every questlog entry (the source of the quest-accept hang).
+-- Rebuilt by BuildStaticRejectSet (same PLAYER_ENTERING_WORLD / locale-swap
+-- timing), so it always reflects the merged base+turtle quest tables.
+pfDatabase.questTitleIndex = {}
+
 function pfDatabase:BuildNameIndex()
   local idx = self.nameIndex
   -- clear existing index in-place
@@ -533,6 +540,12 @@ function pfDatabase:BuildStaticRejectSet()
     reject[id] = nil
   end
 
+  -- (re)build the quest title -> ids index in the same pass.
+  local titleIndex = self.questTitleIndex
+  for t in pairs(titleIndex) do
+    titleIndex[t] = nil
+  end
+
   -- UnitRace/UnitClass may return nil before PLAYER_ENTERING_WORLD.
   -- In that case skip race/class checks; BuildNameIndex is called again
   -- from the locale-detection OnUpdate after login, which will populate them.
@@ -542,8 +555,20 @@ function pfDatabase:BuildStaticRejectSet()
   local pclass = class and pfDatabase:GetBitByClass(class) or nil
 
   for id in pairs(quests) do
+    local loc = pfDB.quests.loc[id]
+    local title = loc and loc.T
+
+    -- index by exact title (every named quest, regardless of reject state, so
+    -- candidate lookups match the old full-table scan behaviour exactly)
+    if title then
+      if not titleIndex[title] then
+        titleIndex[title] = {}
+      end
+      insert(titleIndex[title], id)
+    end
+
     -- missing loc name
-    if not pfDB.quests.loc[id] or not pfDB.quests.loc[id].T then
+    if not title then
       reject[id] = true
 
     -- wrong race (only when prace is known)
@@ -2039,13 +2064,10 @@ function pfDatabase:GetQuestIDs(qid)
   local best = 0
   local results = {}
 
-  local tcount = 0
-  -- check if multiple quests share the same name
-  for id, data in pairs(pfDB["quests"]["loc"]) do
-    if quests[id] and data.T == title then
-      tcount = tcount + 1
-    end
-  end
+  -- O(1) candidate lookup via the prebuilt title index instead of scanning the
+  -- entire quest table on every questlog entry (the source of the accept hang).
+  local candidates = pfDatabase.questTitleIndex[title]
+  local tcount = candidates and getn(candidates) or 0
 
   -- no title was found, run levenshtein on titles
   if tcount == 0 and title then
@@ -2072,15 +2094,17 @@ function pfDatabase:GetQuestIDs(qid)
         return pfQuest_questcache[identifier]
       end
     else
-      -- set title to best result
+      -- set title to best result and refresh candidates for the matched title
       title = ttitle
+      candidates = pfDatabase.questTitleIndex[title]
     end
   end
 
-  for id, data in pairs(pfDB["quests"]["loc"]) do
+  for _, id in pairs(candidates or {}) do
+    local data = pfDB["quests"]["loc"][id]
     local score = 0
 
-    if quests[id] and data.T and data.T == title then
+    if quests[id] and data and data.T == title then
       -- low score for same name
       score = 1
 
