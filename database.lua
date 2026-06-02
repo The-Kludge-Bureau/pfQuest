@@ -1990,6 +1990,9 @@ function pfDatabase:AddCustomIcon(id, img, root)
 end
 
 function pfDatabase:FormatQuestText(questText)
+  -- guard against nil/non-string input: quests with no objective ("O") or
+  -- description ("D") in the DB pass nil here, and string.gsub would error.
+  if type(questText) ~= "string" then return "" end
   questText = string.gsub(questText, "$[Nn]", UnitName("player"))
   questText = string.gsub(questText, "$[Cc]", strlower(UnitClass("player")))
   questText = string.gsub(questText, "$[Rr]", strlower(UnitRace("player")))
