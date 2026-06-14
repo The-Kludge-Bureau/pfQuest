@@ -10,7 +10,7 @@ local GetTime = GetTime
 -- default config
 pfBrowser_fav = { ["units"] = {}, ["objects"] = {}, ["items"] = {}, ["quests"] = {} }
 
-local tooltip_limit = 5
+local tooltip_limit = 30
 local search_limit = 512
 
 -- Reusable tooltip maps table (cleared and reused to avoid GC)
