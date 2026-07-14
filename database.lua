@@ -2003,13 +2003,11 @@ end
 -- Try to guess the quest ID based on the questlog ID
 -- Returns possible quest IDs
 function pfDatabase:GetQuestIDs(qid)
-  if GetQuestLink then
-    local questLink = GetQuestLink(qid)
-    if questLink then
-      local _, _, id = strfind(questLink, "|c.*|Hquest:([%d]+):([-]?[%d]+)|h%[(.*)%]|h|r")
-      if id then
-        return { [1] = tonumber(id) }
-      end
+
+  if GetQuestID then -- SuperWoW compatibility with GetQuestLink & GetQuestID functions
+    local questID = GetQuestID(qid)
+    if questID then
+		return { [1] = questID }
     end
   end
 
