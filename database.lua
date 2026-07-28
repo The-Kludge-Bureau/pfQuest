@@ -980,26 +980,28 @@ function pfDatabase:SearchAreaTriggerID(id, meta, maps, prio)
   local prio = prio or 1
 
   for _, data in pairs(areatrigger[id]["coords"]) do
-    local x, y, zone = unpack(data)
-
-    if zone and zone > 0 then
-      -- add all gathered data
-      meta = meta or {}
-      meta["spawn"] = pfQuest_Loc["Exploration Mark"]
-      meta["spawnid"] = id
-      meta["item"] = nil
-
-      meta["title"] = meta["quest"] or meta["item"] or meta["spawn"]
-      meta["zone"] = zone
-      meta["x"] = x
-      meta["y"] = y
-
-      meta["level"] = pfQuest_Loc["N/A"]
-      meta["spawntype"] = pfQuest_Loc["Trigger"]
-      meta["respawn"] = pfQuest_Loc["N/A"]
-
-      maps[zone] = maps[zone] and maps[zone] + prio or prio
-      pfMap:AddNode(meta)
+    if type(data) == "table" then
+      local x, y, zone = unpack(data)
+  
+      if zone and zone > 0 then
+        -- add all gathered data
+        meta = meta or {}
+        meta["spawn"] = pfQuest_Loc["Exploration Mark"]
+        meta["spawnid"] = id
+        meta["item"] = nil
+  
+        meta["title"] = meta["quest"] or meta["item"] or meta["spawn"]
+        meta["zone"] = zone
+        meta["x"] = x
+        meta["y"] = y
+  
+        meta["level"] = pfQuest_Loc["N/A"]
+        meta["spawntype"] = pfQuest_Loc["Trigger"]
+        meta["respawn"] = pfQuest_Loc["N/A"]
+  
+        maps[zone] = maps[zone] and maps[zone] + prio or prio
+        pfMap:AddNode(meta)
+      end
     end
   end
 
@@ -1030,16 +1032,18 @@ function pfDatabase:SearchMobID(id, meta, maps, prio)
   meta["description"] = pfDatabase:BuildQuestDescription(meta)
 
   for _, data in pairs(units[id]["coords"]) do
-    local x, y, zone, respawn = unpack(data)
-
-    if zone > 0 then
-      meta["zone"] = zone
-      meta["x"] = x
-      meta["y"] = y
-      meta["respawn"] = respawn > 0 and SecondsToTime(respawn)
-
-      maps[zone] = maps[zone] and maps[zone] + prio or prio
-      pfMap:AddNode(meta)
+    if type(data) == "table" then
+      local x, y, zone, respawn = unpack(data)
+  
+      if zone > 0 then
+        meta["zone"] = zone
+        meta["x"] = x
+        meta["y"] = y
+        meta["respawn"] = respawn > 0 and SecondsToTime(respawn)
+  
+        maps[zone] = maps[zone] and maps[zone] + prio or prio
+        pfMap:AddNode(meta)
+      end
     end
   end
 
@@ -1285,16 +1289,18 @@ function pfDatabase:SearchObjectID(id, meta, maps, prio)
   meta["description"] = pfDatabase:BuildQuestDescription(meta)
 
   for _, data in pairs(objects[id]["coords"]) do
-    local x, y, zone, respawn = unpack(data)
-
-    if zone > 0 then
-      meta["zone"] = zone
-      meta["x"] = x
-      meta["y"] = y
-      meta["respawn"] = respawn and SecondsToTime(respawn)
-
-      maps[zone] = maps[zone] and maps[zone] + prio or prio
-      pfMap:AddNode(meta)
+    if type(data) == "table" then
+      local x, y, zone, respawn = unpack(data)
+  
+      if zone > 0 then
+        meta["zone"] = zone
+        meta["x"] = x
+        meta["y"] = y
+        meta["respawn"] = respawn and SecondsToTime(respawn)
+  
+        maps[zone] = maps[zone] and maps[zone] + prio or prio
+        pfMap:AddNode(meta)
+      end
     end
   end
 

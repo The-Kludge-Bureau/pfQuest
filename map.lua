@@ -1571,15 +1571,31 @@ end
 
 -- Resize icons on map zoom change
 function pfMap:OnMapScaleChanged(frame, scale, hookedfunction)
-  if not mainmap_base_effective_scale then
-    mainmap_base_effective_scale = WorldMapButton:GetEffectiveScale() / WorldMapFrame:GetScale()
+  local mapScale = WorldMapFrame:GetScale()
+  local btnScale = WorldMapButton:GetEffectiveScale()
+  
+  if not mainmap_base_effective_scale and mapScale and mapScale > 0 and btnScale and btnScale > 0 then
+    mainmap_base_effective_scale = btnScale / mapScale
   end
+  
   hookedfunction(frame, scale)
-  local zoom_scale = WorldMapButton:GetEffectiveScale() / WorldMapFrame:GetScale()
-  local new_inversescale = mainmap_base_effective_scale / zoom_scale
-  if (mainmap_inversescale ~= new_inversescale) then
-    mainmap_inversescale = new_inversescale
-    pfMap:ResizeNodes()
+  
+  if not mainmap_base_effective_scale then return end
+  
+  local newMapScale = WorldMapFrame:GetScale()
+  local newBtnScale = WorldMapButton:GetEffectiveScale()
+  
+  if newMapScale and newMapScale > 0 and newBtnScale and newBtnScale > 0 then
+    local zoom_scale = newBtnScale / newMapScale
+    if zoom_scale > 0 then
+      local new_inversescale = mainmap_base_effective_scale / zoom_scale
+      if new_inversescale > 10 then new_inversescale = 10 end
+      if new_inversescale < 0.1 then new_inversescale = 0.1 end
+      if (mainmap_inversescale ~= new_inversescale) then
+        mainmap_inversescale = new_inversescale
+        pfMap:ResizeNodes()
+      end
+    end
   end
 end
 -- Listen for WorldMapFrame scale changes
