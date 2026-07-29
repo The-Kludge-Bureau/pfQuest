@@ -137,19 +137,19 @@ local function minimap_indoor()
   local state = 1
   if GetCVar("minimapZoom") == GetCVar("minimapInsideZoom") then
     if GetCVar("minimapInsideZoom") + 0 >= 3 then
-      pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() - 1)
+      Minimap:SetZoom(Minimap:GetZoom() - 1)
       tempzoom = 1
     else
-      pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + 1)
+      Minimap:SetZoom(Minimap:GetZoom() + 1)
       tempzoom = -1
     end
   end
 
-  if GetCVar("minimapInsideZoom") + 0 == pfMap.drawlayer:GetZoom() then
+  if GetCVar("minimapInsideZoom") + 0 == Minimap:GetZoom() then
     state = 0
   end
 
-  pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + tempzoom)
+  Minimap:SetZoom(Minimap:GetZoom() + tempzoom)
   return state
 end
 
@@ -239,6 +239,28 @@ pfMap.pins = {}
 pfMap.mpins = {}
 pfMap.drawlayer = Minimap
 pfMap.unifiedcache = unifiedcache
+
+pfMap.wmap_containers = {}
+pfMap.mmap_containers = {}
+
+function pfMap:GetContainer(is_minimap, index)
+  local cidx = math.floor(index / 200)
+  if is_minimap then
+    if not pfMap.mmap_containers[cidx] then
+      local f = CreateFrame("Frame", "pfQuestMMapContainer" .. cidx, pfMap.drawlayer)
+      f:SetAllPoints(pfMap.drawlayer)
+      pfMap.mmap_containers[cidx] = f
+    end
+    return pfMap.mmap_containers[cidx]
+  else
+    if not pfMap.wmap_containers[cidx] then
+      local f = CreateFrame("Frame", "pfQuestWMapContainer" .. cidx, WorldMapButton)
+      f:SetAllPoints(WorldMapButton)
+      pfMap.wmap_containers[cidx] = f
+    end
+    return pfMap.wmap_containers[cidx]
+  end
+end
 
 -- Reverse indexes for O(1) DeleteNode lookups.
 -- titleIndex[addon][title][map][coords] = true  — set by AddNode
@@ -1149,7 +1171,7 @@ function pfMap:UpdateNodes()
   -- is resized between calls the new values will invalidate cached px/py.
   local mapW = WorldMapButton:GetWidth()
   local mapH = WorldMapButton:GetHeight()
-  local MAX_PINS = 250 -- WoW UI engine crashes with Access Violation if too many child frames (e.g. 1000+) are added to a single parent
+  local MAX_PINS = 5000 -- Unlimited, handled by chunking containers
 
   for addon, _ in pairs(pfMap.nodes) do
     if n_pins > MAX_PINS then break end
@@ -1162,7 +1184,8 @@ function pfMap:UpdateNodes()
         end
 
         if not pfMap.pins[i] then
-          pfMap.pins[i] = pfMap:BuildNode("pfMapPin" .. i, WorldMapButton)
+          local container = pfMap:GetContainer(false, i)
+          pfMap.pins[i] = pfMap:BuildNode("pfMapPin" .. i, container)
         end
 
         -- skip UpdateNode if this pin is already bound to this exact node table
@@ -1290,7 +1313,7 @@ function pfMap:UpdateMinimap()
     return
   end
 
-  local mZoom = pfMap.drawlayer:GetZoom()
+  local mZoom = Minimap:GetZoom()
   xPlayer, yPlayer = xPlayer * 100, yPlayer * 100
 
   -- force refresh every second even without changed values, otherwise skip
@@ -1321,7 +1344,7 @@ function pfMap:UpdateMinimap()
   end
 
   local i = 1
-  local MAX_MINIMAP_PINS = 150 -- Prevent C++ engine crash on ReloadUI from too many children
+  local MAX_MINIMAP_PINS = 5000 -- Unlimited, handled by chunking containers
 
   -- refresh all nodes
   for addon, data in pairs(pfMap.nodes) do
@@ -1365,7 +1388,8 @@ function pfMap:UpdateMinimap()
 
         if display then
           if not pfMap.mpins[i] then
-            pfMap.mpins[i] = pfMap:BuildNode(nodename .. i, pfMap.drawlayer)
+            local container = pfMap:GetContainer(true, i)
+            pfMap.mpins[i] = pfMap:BuildNode(nodename .. i, container)
           end
 
           -- skip expensive UpdateNode work (highlightdb rebuild, node iteration,
