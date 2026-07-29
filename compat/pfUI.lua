@@ -294,15 +294,25 @@ pfUI.api.CreateScrollChild = pfUI.api.CreateScrollChild
 
     f:SetScript("OnUpdate", function()
       -- WoW 1.12 has no OnScrollRangeChanged event, so we must poll.
-      -- Cache the last seen values and only call UpdateScrollState when
-      -- something actually changed — avoids 60+ redundant calls per second
-      -- per scroll frame when content is static.
+      -- Wait until PLAYER_ENTERING_WORLD has fired so the layout engine is fully initialized.
+      if not this._loaded then return end
+      if not this:IsVisible() then return end
       local range = this:GetParent():GetVerticalScrollRange()
       local height = this:GetParent():GetHeight()
       if range ~= this._lastRange or height ~= this._lastHeight then
         this._lastRange = range
         this._lastHeight = height
         this:GetParent():UpdateScrollState()
+      end
+    end)
+
+    f:RegisterEvent("PLAYER_ENTERING_WORLD")
+    f:RegisterEvent("PLAYER_LOGOUT")
+    f:SetScript("OnEvent", function()
+      if event == "PLAYER_ENTERING_WORLD" then
+        this._loaded = true
+      elseif event == "PLAYER_LOGOUT" then
+        this:SetScript("OnUpdate", nil)
       end
     end)
 
