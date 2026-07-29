@@ -171,6 +171,7 @@ tracker:SetScript("OnMouseUp", function()
 end)
 
 tracker:SetScript("OnUpdate", function()
+  if pfMap and pfMap.unloaded then return end
   if WorldMapFrame:IsShown() then
     if this.strata ~= "FULLSCREEN_DIALOG" then
       this:SetFrameStrata("FULLSCREEN_DIALOG")

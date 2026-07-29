@@ -137,19 +137,19 @@ local function minimap_indoor()
   local state = 1
   if GetCVar("minimapZoom") == GetCVar("minimapInsideZoom") then
     if GetCVar("minimapInsideZoom") + 0 >= 3 then
-      pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() - 1)
+      Minimap:SetZoom(Minimap:GetZoom() - 1)
       tempzoom = 1
     else
-      pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + 1)
+      Minimap:SetZoom(Minimap:GetZoom() + 1)
       tempzoom = -1
     end
   end
 
-  if GetCVar("minimapInsideZoom") + 0 == pfMap.drawlayer:GetZoom() then
+  if GetCVar("minimapInsideZoom") + 0 == Minimap:GetZoom() then
     state = 0
   end
 
-  pfMap.drawlayer:SetZoom(pfMap.drawlayer:GetZoom() + tempzoom)
+  Minimap:SetZoom(Minimap:GetZoom() + tempzoom)
   return state
 end
 
@@ -239,6 +239,28 @@ pfMap.pins = {}
 pfMap.mpins = {}
 pfMap.drawlayer = Minimap
 pfMap.unifiedcache = unifiedcache
+
+pfMap.wmap_containers = {}
+pfMap.mmap_containers = {}
+
+function pfMap:GetContainer(is_minimap, index)
+  local cidx = math.floor(index / 200)
+  if is_minimap then
+    if not pfMap.mmap_containers[cidx] then
+      local f = CreateFrame("Frame", "pfQuestMMapContainer" .. cidx, pfMap.drawlayer)
+      f:SetAllPoints(pfMap.drawlayer)
+      pfMap.mmap_containers[cidx] = f
+    end
+    return pfMap.mmap_containers[cidx]
+  else
+    if not pfMap.wmap_containers[cidx] then
+      local f = CreateFrame("Frame", "pfQuestWMapContainer" .. cidx, WorldMapButton)
+      f:SetAllPoints(WorldMapButton)
+      pfMap.wmap_containers[cidx] = f
+    end
+    return pfMap.wmap_containers[cidx]
+  end
+end
 
 -- Reverse indexes for O(1) DeleteNode lookups.
 -- titleIndex[addon][title][map][coords] = true  — set by AddNode
@@ -1149,11 +1171,21 @@ function pfMap:UpdateNodes()
   -- is resized between calls the new values will invalidate cached px/py.
   local mapW = WorldMapButton:GetWidth()
   local mapH = WorldMapButton:GetHeight()
+  local MAX_PINS = 5000 -- Unlimited, handled by chunking containers
+
   for addon, _ in pairs(pfMap.nodes) do
+    if n_pins > MAX_PINS then break end
     if pfMap.nodes[addon][map] then
       for coords, node in pairs(pfMap.nodes[addon][map]) do
+        n_pins = n_pins + 1
+        
+        if n_pins > MAX_PINS then
+          break
+        end
+
         if not pfMap.pins[i] then
-          pfMap.pins[i] = pfMap:BuildNode("pfMapPin" .. i, WorldMapButton)
+          local container = pfMap:GetContainer(false, i)
+          pfMap.pins[i] = pfMap:BuildNode("pfMapPin" .. i, container)
         end
 
         -- skip UpdateNode if this pin is already bound to this exact node table
@@ -1210,6 +1242,10 @@ function pfMap:UpdateNodes()
 
           local px = x / 100 * mapW
           local py = y / 100 * mapH
+
+          -- sanitize against NaN or Inf coordinates from corrupted WoW engine frame dimensions
+          if not (px >= -100000 and px <= 100000) then px = 0 end
+          if not (py >= -100000 and py <= 100000) then py = 0 end
 
           -- skip layout calls when the pin hasn't moved; ClearAllPoints +
           -- SetPoint are the dominant cost in UpdateNodes for large pin counts
@@ -1277,7 +1313,7 @@ function pfMap:UpdateMinimap()
     return
   end
 
-  local mZoom = pfMap.drawlayer:GetZoom()
+  local mZoom = Minimap:GetZoom()
   xPlayer, yPlayer = xPlayer * 100, yPlayer * 100
 
   -- force refresh every second even without changed values, otherwise skip
@@ -1293,22 +1329,30 @@ function pfMap:UpdateMinimap()
   local color = pfQuest_config["spawncolors"] == "1" and "spawn" or "title"
   local mapID = pfMap:GetMapIDByName(GetRealZoneText())
   local mapZoom = minimap_zoom[minimap_indoor()][mZoom]
-  local mapWidth = minimap_sizes[mapID] and minimap_sizes[mapID][1] or 0
-  local mapHeight = minimap_sizes[mapID] and minimap_sizes[mapID][2] or 0
+  local mapWidth = (minimap_sizes[mapID] and minimap_sizes[mapID][1]) or 0
+  local mapHeight = (minimap_sizes[mapID] and minimap_sizes[mapID][2]) or 0
 
-  local xScale = mapZoom / mapWidth
-  local yScale = mapZoom / mapHeight
-
-  local xDraw = pfMap.drawlayer:GetWidth() / xScale / 100
-  local yDraw = pfMap.drawlayer:GetHeight() / yScale / 100
+  local xDraw, yDraw
+  if mapWidth > 0 and mapHeight > 0 then
+    local xScale = mapZoom / mapWidth
+    local yScale = mapZoom / mapHeight
+    xDraw = pfMap.drawlayer:GetWidth() / xScale / 100
+    yDraw = pfMap.drawlayer:GetHeight() / yScale / 100
+  else
+    xDraw = 0
+    yDraw = 0
+  end
 
   local i = 1
+  local MAX_MINIMAP_PINS = 5000 -- Unlimited, handled by chunking containers
 
   -- refresh all nodes
   for addon, data in pairs(pfMap.nodes) do
+    if i > MAX_MINIMAP_PINS then break end
     -- hide minimap nodes in continent view
     if data[mapID] and minimap_sizes[mapID] and pfMap:HasMinimap(mapID) then
       for coords, node in pairs(data[mapID]) do
+        if i > MAX_MINIMAP_PINS then break end
         local x, y
         if coord_cache[coords] then
           x, y = coord_cache[coords][1], coord_cache[coords][2]
@@ -1344,7 +1388,8 @@ function pfMap:UpdateMinimap()
 
         if display then
           if not pfMap.mpins[i] then
-            pfMap.mpins[i] = pfMap:BuildNode(nodename .. i, pfMap.drawlayer)
+            local container = pfMap:GetContainer(true, i)
+            pfMap.mpins[i] = pfMap:BuildNode(nodename .. i, container)
           end
 
           -- skip expensive UpdateNode work (highlightdb rebuild, node iteration,
@@ -1365,6 +1410,10 @@ function pfMap:UpdateMinimap()
           elseif pfQuest_config["showspawnmini"] == "0" and addon == "PFQUEST" and not pfMap.mpins[i].texture then
             pfMap.mpins[i]:Hide()
           else
+            -- sanitize against NaN or Inf coordinates from corrupted WoW engine frame dimensions
+            if not (xPos >= -100000 and xPos <= 100000) then xPos = 0 end
+            if not (yPos >= -100000 and yPos <= 100000) then yPos = 0 end
+
             pfMap.mpins[i]:ClearAllPoints()
             pfMap.mpins[i]:SetPoint("CENTER", pfMap.drawlayer, "CENTER", xPos, -yPos)
             pfMap.mpins[i]:Show()
@@ -1390,13 +1439,23 @@ pfMap:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 pfMap:RegisterEvent("MINIMAP_ZONE_CHANGED")
 pfMap:RegisterEvent("PLAYER_ENTERING_WORLD")
 pfMap:RegisterEvent("WORLD_MAP_UPDATE")
+pfMap:RegisterEvent("PLAYER_LOGOUT")
 pfMap:SetScript("OnEvent", function()
+  if event == "PLAYER_LOGOUT" then
+    pfMap.unloaded = true
+    return
+  end
+
   -- save current zone
   zone = GetCurrentMapZone()
 
   -- set map to current zone when possible
   if event == "ZONE_CHANGED" or event == "MINIMAP_ZONE_CHANGED"
      or event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_ENTERING_WORLD" then
+    if event == "PLAYER_ENTERING_WORLD" then
+      pfMap.loaded = true
+    end
+    
     if not WorldMapFrame:IsShown() then
       SetMapToCurrentZone()
       -- Cache the player's physical zone while the map is synced to it.
@@ -1459,6 +1518,8 @@ end)
 
 local hlstate, shiftstate, transition, hidecluster, fps, resetmap
 pfMap:SetScript("OnUpdate", function()
+  if pfMap.unloaded then return end
+
   -- handle highlights and animations
   if pfMap.queue_update or transition or pfMap.highlight ~= hlstate or shiftstate ~= hidecluster then
     hlstate, shiftstate, transition = pfMap.highlight, hidecluster, nil
@@ -1494,6 +1555,11 @@ pfMap:SetScript("OnUpdate", function()
   end
 
   -- process node updates if required
+  if pfMap.queue_resize then
+    pfMap.queue_resize = nil
+    pfMap:ResizeNodes()
+  end
+
   if pfMap.queue_update and pfMap.queue_update + 0.25 < GetTime() then
     -- don't fire while the quest system still has work pending: each queue entry
     -- and SearchQuests/UpdateQuestlog call will push queue_update to a newer time,
@@ -1527,8 +1593,10 @@ pfMap:SetScript("OnUpdate", function()
     resetmap = nil
   end
 
-  -- refresh minimap
-  pfMap:UpdateMinimap()
+  -- refresh minimap only after UI is fully loaded
+  if pfMap.loaded then
+    pfMap:UpdateMinimap()
+  end
 
   -- update hidecluster detection
   if controlkey.pressed then
@@ -1571,15 +1639,37 @@ end
 
 -- Resize icons on map zoom change
 function pfMap:OnMapScaleChanged(frame, scale, hookedfunction)
-  if not mainmap_base_effective_scale then
-    mainmap_base_effective_scale = WorldMapButton:GetEffectiveScale() / WorldMapFrame:GetScale()
-  end
   hookedfunction(frame, scale)
-  local zoom_scale = WorldMapButton:GetEffectiveScale() / WorldMapFrame:GetScale()
-  local new_inversescale = mainmap_base_effective_scale / zoom_scale
-  if (mainmap_inversescale ~= new_inversescale) then
-    mainmap_inversescale = new_inversescale
-    pfMap:ResizeNodes()
+
+  -- Do not access WorldMapButton until the UI is fully loaded and initialized,
+  -- as it can cause C++ engine crashes during XML layout parsing.
+  -- Additionally, check WorldMapButton[0] to ensure the C++ object is not dead during ReloadUI.
+  if not pfMap.loaded or pfMap.unloaded or not WorldMapButton or not WorldMapButton[0] then return end
+
+  local mapScale = WorldMapFrame:GetScale()
+  local btnScale = WorldMapButton:GetEffectiveScale()
+  
+  if not mainmap_base_effective_scale and mapScale and mapScale > 0 and btnScale and btnScale > 0 then
+    mainmap_base_effective_scale = btnScale / mapScale
+  end
+  
+  if not mainmap_base_effective_scale then return end
+  
+  local newMapScale = WorldMapFrame:GetScale()
+  local newBtnScale = WorldMapButton:GetEffectiveScale()
+  
+  if newMapScale and newMapScale > 0 and newBtnScale and newBtnScale > 0 then
+    local zoom_scale = newBtnScale / newMapScale
+    if zoom_scale > 0 then
+      local new_inversescale = mainmap_base_effective_scale / zoom_scale
+      if not (new_inversescale >= 0.1 and new_inversescale <= 10) then
+        new_inversescale = 1
+      end
+      if (mainmap_inversescale ~= new_inversescale) then
+        mainmap_inversescale = new_inversescale
+        pfMap.queue_resize = true
+      end
+    end
   end
 end
 -- Listen for WorldMapFrame scale changes
