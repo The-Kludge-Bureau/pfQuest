@@ -1062,6 +1062,7 @@ local skill = {
   ["mines"] = true,
   ["rares"] = true,
   ["chests"] = true,
+  ["wood"] = true,
 }
 
 function pfDatabase:SearchMetaRelation(query, meta, show)
@@ -1258,6 +1259,10 @@ function pfDatabase:SearchObjectSkill(id)
   elseif pfDB["meta"]["mines"][-id] then
     skill = pfDB["meta"]["mines"][-id]
     caption = pfQuest_Loc["Mining"]
+  elseif pfDB["meta"]["wood"] and pfDB["meta"]["wood"][-id] then
+    -- "wood" is contributed by pfQuest-turtle, so it may be absent entirely
+    skill = pfDB["meta"]["wood"][-id]
+    caption = pfQuest_Loc["Survival"]
   end
 
   return skill, caption
