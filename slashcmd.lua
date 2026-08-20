@@ -172,6 +172,12 @@ SlashCmdList["PFDB"] = function(input, editbox)
       state.min = state.max - 100
     end
 
+    -- read skill for auto wood (TurtleWoW "Survival" profession)
+    if list == "wood" and commandlist[3] == "auto" then
+      state.max = pfDatabase:GetPlayerSkill(142) or 0
+      state.min = state.max - 100
+    end
+
     -- clean specific list
     if commandlist[3] == "clean" then
       state = nil

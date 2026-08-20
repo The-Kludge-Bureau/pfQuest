@@ -208,6 +208,7 @@ do -- tracking menu
     { "herbs", pfQuest_Loc["Herbs & Flowers"], pfDatabase.TrackMeta, true },
     { "mines", pfQuest_Loc["Mines & Ores"], pfDatabase.TrackMeta, true },
     { "fish", pfQuest_Loc["Fishing Pools"], pfDatabase.TrackMeta, true },
+    { "wood", pfQuest_Loc["Trees & Lumber"], pfDatabase.TrackMeta, true },
     { "rares", pfQuest_Loc["Rare Mobs"], pfDatabase.TrackMeta, true },
     { "-" },
     { "auctioneer", pfQuest_Loc["Auctioneer"], pfDatabase.TrackMeta, true },
