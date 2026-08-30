@@ -1990,6 +1990,15 @@ function pfDatabase:AddCustomIcon(id, img, root)
 end
 
 function pfDatabase:FormatQuestText(questText)
+  -- Some quests carry no ["O"] or no ["D"] at all. Most callers check before
+  -- calling, but the same-name disambiguation in GetQuestIDs does not, so a
+  -- candidate missing one threw here. An empty string is the right answer: a
+  -- missing description simply fails to match, which is what that scoring
+  -- concludes anyway.
+  if type(questText) ~= "string" then
+    return ""
+  end
+
   questText = string.gsub(questText, "$[Nn]", UnitName("player"))
   questText = string.gsub(questText, "$[Cc]", strlower(UnitClass("player")))
   questText = string.gsub(questText, "$[Rr]", strlower(UnitRace("player")))
